@@ -20,3 +20,15 @@ if(PPL_LIBRARY)
 else()
     message(FATAL_ERROR "PPL library not found!")
 endif()
+
+# Path to header files (.h, .hpp)
+target_include_directories(math_prog_extended PRIVATE
+        ${PPL_INCLUDE_DIR}
+        /usr/include/
+)
+
+# Path to lib files (.so, .a)
+target_link_libraries(math_prog_extended PRIVATE
+        ${PPL_LIBRARY}
+        /usr/lib/libscip.so
+)

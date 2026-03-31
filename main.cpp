@@ -1,7 +1,13 @@
 #include <iostream>
 #include <ppl.hh>
+#include <scippp/model.hpp>
+using namespace scippp;
 
 int main() {
-    std::cout << "A simple test to see if we find all the libraries" << std::endl;
-    return 0;
+    Model model("Simple");
+    auto x1 = model.addVar("x_1", 1);
+    auto x2 = model.addVar("x_2", 1);
+    model.addConstr(3 * x1 + 2 * x2 <= 1, "capacity");
+    model.setObjsense(Sense::MAXIMIZE);
+    model.solve();
 }

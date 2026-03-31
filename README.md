@@ -31,3 +31,17 @@ export PPL_INCLUDE_DIR=PPL_INCLUDE_DIR:/path/to/PPL/src/
 ```
 
 ## Install SCIP
+------------------------------
+First, download the SCIPOpt Optimization Suite: https://scipopt.org/index.php#download and install it.
+The executable `scip` will be in `/usr/bin/`, but we will need headers and libraries. 
+Libraries will be in `usr/lib/` and headers in `/usr/include/`. You might want to add these paths to the environment variables:
+
+Then, the C++ wrapper for SCIP. Download this repository: [SCIP](https://github.com/scipopt/SCIPpp)
+
+Install [Conan](https://github.com/conan-io/conan) to make your life easier. The installation is 
+with Python; you might want to do keep it in mind when choosing th right environment. 
+
+Then follow the instructions on the README file in the section "With Conan v2 and CMake v3.19 or later".
+You might need some `sudo`s here and there.
+
+# TODO link libs in CMakeLists.txt
