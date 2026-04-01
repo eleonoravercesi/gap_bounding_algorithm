@@ -1,13 +1,17 @@
+#include "scip/scip.h"
+#include "scip/scipdefplugins.h"
+#include "ppl.hh"
 #include <iostream>
-#include <ppl.hh>
-#include <scippp/model.hpp>
-using namespace scippp;
+#include "include/readers.h"
+#include <vector>
 
-int main() {
-    Model model("Simple");
-    auto x1 = model.addVar("x_1", 1);
-    auto x2 = model.addVar("x_2", 1);
-    model.addConstr(3 * x1 + 2 * x2 <= 1, "capacity");
-    model.setObjsense(Sense::MAXIMIZE);
-    model.solve();
+int main(int argc, char* argv[]) {
+    vector<vector<float>> vertices = read_vertices_chm(argv[1]);
+
+    for (vector<float> x: vertices) {
+        for (float x_e : x) {
+            cout << x_e << " ";
+        }
+        cout << endl;
+    }
 }

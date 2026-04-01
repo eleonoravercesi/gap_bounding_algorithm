@@ -12,7 +12,8 @@ include_directories(${PPL_INCLUDE_DIR})
 # 2. Find the library file (usually libppl)
 find_library(PPL_LIBRARY NAMES ppl)
 
-add_executable(math_prog_extended main.cpp)
+add_executable(math_prog_extended main.cpp
+        include/readers.h)
 
 # 3. Link the library to your executable
 if(PPL_LIBRARY)
@@ -32,3 +33,6 @@ target_link_libraries(math_prog_extended PRIVATE
         ${PPL_LIBRARY}
         /usr/lib/libscip.so
 )
+
+# Pick a name for the executable
+set_target_properties(math_prog_extended PROPERTIES OUTPUT_NAME "./solver")

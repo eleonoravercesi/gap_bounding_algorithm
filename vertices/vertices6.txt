@@ -1,0 +1,4 @@
+c This file contains 2 elements.
+c These are all non-isomorphic vertices of SEP for n=6.
+1/1 1/1 0/1 0/1 0/1 0/1 0/1 1/1 0/1 0/1 0/1 1/1 1/1 1/1 0/1
+1/2 1/2 1/1 0/1 0/1 1/2 0/1 0/1 1/1 0/1 1/1 0/1 1/2 1/2 1/2
