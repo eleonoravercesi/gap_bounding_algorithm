@@ -1,3 +1,6 @@
+#include <iostream>
+#include <ostream>
+
 #include "scip/scip.h"
 #include "scip/scipdefplugins.h"
 #include <vector>
@@ -8,7 +11,7 @@ using namespace std;
 
 double opt_plus(const vector<double>& x, int ncount) {
     //TODO This is horrible
-    int MEGA = 1000;
+    int MEGA = 1000; // A large constant to scale the continuous variables to integers for TSP solving
 
     SCIP* scip = nullptr;
     SCIP_CALL(SCIPcreate(&scip));
@@ -24,7 +27,6 @@ double opt_plus(const vector<double>& x, int ncount) {
             char vname[64];
             snprintf(vname, sizeof(vname), "c_%d_%d", i, j);
 
-            // Check bounds for x
             double obj_coef = (cont < x.size()) ? x[cont] : 0.0;
 
             SCIP_CALL(SCIPcreateVarBasic(scip, &c[i][j], vname,
@@ -37,7 +39,7 @@ double opt_plus(const vector<double>& x, int ncount) {
         }
     }
 
-    // 2. Constraints: triangle inequalities
+    // Constraints: triangle inequalities
     for (int i = 0; i < ncount; ++i) {
         for (int j = i + 1; j < ncount; ++j) {
             for (int k = j + 1; k < ncount; ++k) {
@@ -84,6 +86,7 @@ double opt_plus(const vector<double>& x, int ncount) {
         SCIP_CALL(SCIPaddCoefLinear(scip, tour_cons, c[init_tour[i]][init_tour[i + 1]], 1.0));
     }
     SCIP_CALL(SCIPaddCons(scip, tour_cons));
+
     SCIP_CALL(SCIPreleaseCons(scip, &tour_cons)); // Release immediately after adding
 
 
@@ -92,6 +95,7 @@ double opt_plus(const vector<double>& x, int ncount) {
 
     SCIP_SOL* sol = SCIPgetBestSol(scip);
     double opt = SCIPgetSolOrigObj(scip, sol);
+
 
     bool converged;
 
@@ -106,48 +110,50 @@ double opt_plus(const vector<double>& x, int ncount) {
             for (int i = 0; i < ncount; ++i) {
                 for (int j = i + 1; j < ncount; ++j) {
                     // TODO QUICK AND DIRTY MUST BE FIXED
+                    cout << SCIPgetSolVal(scip, sol, c[i][j]) << " ";
                     int c_i_j = MEGA * SCIPgetSolVal(scip, sol, c[i][j]);
                     C.push_back(c_i_j);
                 }
             }
             auto out = solve_tsp(C, ncount, 1);
-
+            cout << "This tour current val: " << get<0>(out) << endl;
             if (get<0>(out) < MEGA) {
+                // Revert SCIP to the modification stage
+                SCIP_CALL(SCIPfreeTransform(scip));
+
                 init_tour = get<1>(out);
+
+                // Add the tour constraint: c^T init_tour >= 1
+                SCIP_CONS* tour_cons = nullptr;
+
+                // Create the cons
+                char tour_cname[64];
+                snprintf(tour_cname, sizeof(tour_cname), "init_tour_const");
+                SCIP_CALL(SCIPcreateConsBasicLinear(scip, &tour_cons, tour_cname, 0, nullptr, nullptr,
+                                                                    1, SCIPinfinity(scip)));
                 for (int i = 0; i < ncount; ++i) {
-                    // Add the tour constraint: c^T init_tour >= 1
-                    SCIP_CONS* tour_cons = nullptr;
-                    // Create the cons
-                    char tour_cname[64];
-                    snprintf(tour_cname, sizeof(tour_cname), "init_tour_const");
-                    SCIP_CALL(SCIPcreateConsBasicLinear(scip, &tour_cons, tour_cname, 0, nullptr, nullptr,
-                                                                        1, SCIPinfinity(scip)));
-                    for (int i = 0; i < ncount; ++i) {
-                        SCIP_CALL(SCIPaddCoefLinear(scip, tour_cons, c[init_tour[i]][init_tour[i + 1]], 1.0));
+                    SCIP_CALL(SCIPaddCoefLinear(scip, tour_cons, c[init_tour[i]][init_tour[i + 1]], 1.0));
+                }
+                SCIP_CALL(SCIPaddCons(scip, tour_cons));
+                SCIP_CALL(SCIPreleaseCons(scip, &tour_cons)); // Release immediately after adding
+
+                // Solve
+                SCIP_CALL(SCIPsolve(scip));
+                sol = SCIPgetBestSol(scip); // Update the solution pointer for the next iteration
+
+                // Get opt again
+                opt = SCIPgetSolOrigObj(scip, sol);
+                // Cleanup Variables
+                for (int i = 0; i < ncount; ++i) {
+                    for (int j = i + 1; j < ncount; ++j) {
+                        SCIP_CALL(SCIPreleaseVar(scip, &c[i][j]));
                     }
-                    SCIP_CALL(SCIPaddCons(scip, tour_cons));
-                    SCIP_CALL(SCIPreleaseCons(scip, &tour_cons)); // Release immediately after adding
-
-
-                    SCIP_CALL(SCIPsolve(scip));
-
-                    SCIP_SOL* sol = SCIPgetBestSol(scip);
                 }
             }
             else {
                 converged = true;
             }
-        }
-    }
-
-    // Get opt again
-    opt = SCIPgetSolOrigObj(scip, sol);
-    // Cleanup Variables
-    for (int i = 0; i < ncount; ++i) {
-        for (int j = i + 1; j < ncount; ++j) {
-            SCIP_CALL(SCIPreleaseVar(scip, &c[i][j]));
-        }
-    }
+        } //TODO check the logcial flow of this while loop, it seems to be working but I am not sure if it is correct
 
     SCIP_CALL(SCIPfree(&scip));
     return opt;

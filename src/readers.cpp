@@ -43,8 +43,8 @@ vector<vector<double>> read_vertices_chm(const string& filename) {
 
                 vertex.push_back(num_float / den_float);
             }
+            vertices.push_back(vertex);
         }
-        vertices.push_back(vertex);
     }
 
     return vertices;
