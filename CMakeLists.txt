@@ -1,45 +1,42 @@
-# Gemini helped with this
-
-# WARNING: All the paths are hard-coded, you might want to change them to fit your system setup.
-
-cmake_minimum_required(VERSION 4.2)
+cmake_minimum_required(VERSION 3.10) # 4.2 is very high/uncommon, 3.10 is safer
 project(math_prog_extended)
 
 set(CMAKE_CXX_STANDARD 20)
 
-# 1. Find the headers
+# 1. Setup PPL
 find_path(PPL_INCLUDE_DIR ppl.hh)
-include_directories(${PPL_INCLUDE_DIR})
-
-# 2. Find the library file (usually libppl)
 find_library(PPL_LIBRARY NAMES ppl)
 
-add_executable(math_prog_extended main.cpp
-        include/readers.h
-        include/solvers.h)
+# 2. Define all your SOURCE files (.cpp)
+# Note: You don't need to list .h files in add_executable
+set(SOURCES
+        main.cpp
+        src/solvers.cpp
+        src/readers.cpp
+        src/gap_related_functions.cpp
+)
 
-# 3. Link the library to your executable
-if(PPL_LIBRARY)
-    target_link_libraries(math_prog_extended PRIVATE ${PPL_LIBRARY})
-else()
-    message(FATAL_ERROR "PPL library not found!")
-endif()
+# 3. Create the executable using the SOURCES list
+add_executable(math_prog_extended ${SOURCES})
 
-# Path to header files (.h, .hpp)
+# 4. Handle Include Directories (The -I flags)
 target_include_directories(math_prog_extended PRIVATE
+        include
         ${PPL_INCLUDE_DIR}
         /usr/include/
-        /home/vercee/libraries/concorde/build # For Concorde headers
-        /home/vercee/libraries/concorde/cplex # For Concorde CPLEX headers
+        /home/vercee/libraries/concorde/build
+        /home/vercee/libraries/concorde/cplex
 )
 
-# Path to lib files (.so, .a)
+# 5. Handle Linking (The -L and -l flags)
 target_link_libraries(math_prog_extended PRIVATE
         ${PPL_LIBRARY}
-        /usr/lib/libscip.so
-        /home/vercee/libraries/concorde/build/concorde.a # For Concorde library
-        /home/vercee/libraries/concorde/cplex/libcplex.a # For CPLEX library
+        scip              # If installed in /usr/lib, you can just use the name
+        /home/vercee/libraries/concorde/build/concorde.a
+        /home/vercee/libraries/concorde/cplex/libcplex.a
+        m                 # Math library
+        pthread           # Thread library (often required by SCIP/CPLEX)
 )
 
-# Pick a name for the executable
-set_target_properties(math_prog_extended PROPERTIES OUTPUT_NAME "./solver")
+# 6. Set output name
+set_target_properties(math_prog_extended PROPERTIES OUTPUT_NAME "solver")
