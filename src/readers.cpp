@@ -6,6 +6,7 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include <sstream>
 
 using namespace std;
 
@@ -13,39 +14,36 @@ using namespace std;
 // See here https://bonndata.uni-bonn.de/dataset.xhtml?persistentId=doi:10.60507/FK2/JK95PC
 vector<vector<double>> read_vertices_chm(const string& filename) {
     vector<vector<double>> vertices;
-
-    // Open the file
-    ifstream vertices_file(filename.c_str());
-
+    ifstream vertices_file(filename);
     string line;
 
-    // Use a while loop together with the getline() function to read the file line by line
-    while (getline (vertices_file, line)) {
-        // Skip all the lines that begins with c
+    while (getline(vertices_file, line)) {
+        if (line.empty() || line[0] == 'c') continue;
+
         vector<double> vertex;
-        if (not line.starts_with('c')) {
-            // Split the line into tokens using space as a delimiter
-            size_t pos = 0;
-            string token;
-            while ((pos = line.find(' ')) != string::npos) {
-                token = line.substr(0, pos);
-                line = line.substr(pos + 1);
+        stringstream ss(line);
+        string token;
 
-                // Now that you have the token, split it acording to "/"
-                string num;
-                string den;
-                num = line.substr(0, line.find('/'));
-                den = line.substr(2, line.find('/'));
+        // This correctly splits the line by spaces
+        while (ss >> token) {
+            size_t slash_pos = token.find('/');
+            if (slash_pos != string::npos) {
+                // Split the token (e.g., "1/2") into parts
+                string num_str = token.substr(0, slash_pos);
+                string den_str = token.substr(slash_pos + 1);
 
-                // Convert num and den to float and push back the value num/den to the vertex vector
-                double num_float = stof(num);
-                double den_float = stof(den);
+                double num = stod(num_str);
+                double den = stod(den_str);
 
-                vertex.push_back(num_float / den_float);
+                vertex.push_back(num / den);
+            } else {
+                // Handle cases without a slash if necessary
+                vertex.push_back(stod(token));
             }
+        }
+        if (!vertex.empty()) {
             vertices.push_back(vertex);
         }
     }
-
     return vertices;
 }

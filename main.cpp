@@ -26,8 +26,8 @@ int main(int argc, char *argv[]){
     int n_edges = n_int * (n_int - 1) / 2;
     int cont = 0;
     vector<vector<double>> x_list = read_vertices_chm(filename);
-    vector<double> x_0 = x_list[0];
+    vector<double> x_0 = x_list[1];
     double opt_plus_val = opt_plus(x_0, n_int);
-    cout << "opt_plus_val = " << opt_plus_val << endl;
 
+    cout << opt_plus_val << endl;
 }

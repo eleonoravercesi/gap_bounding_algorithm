@@ -8,6 +8,7 @@ extern "C" {
 #include <tuple>
 #include "../include/solvers.h"
 #include <iostream>
+#include <fstream>
 
 using namespace std;
 
@@ -25,27 +26,37 @@ tuple<double, vector<int>> solve_tsp(const vector<int>& C, int ncount, int silen
     CCdatagroup dat;
     CCutil_init_datagroup(&dat);
 
-    // Dummy vectot
+    // Dummy vector
     vector<int> dummy_ret = {1};
 
     int nedges = ncount * (ncount - 1) / 2;
-    int* edges_val = (int*)malloc(nedges * sizeof(int));
+    //int* edges_val = (int*)malloc(nedges * sizeof(int));
+    int*edges_val = (int*)malloc((nedges) * sizeof(int) );
+
 
     // Fill the edges val
-    int cont = 0;
     if (edges_val != NULL) {
         for (int i = 0; i < nedges; i++) {
-            edges_val[i] = C[cont]; // No zero edges
-            cont++;
+            edges_val[i] = C[i];
         }
 
         // Convert the flat edge array into the CCdatagroup format
+        cout << "Before calling tr2dat:" << endl;
+        for (int i = 0; i < nedges; i++) {
+            cout << "Edge " << i << ": " << edges_val[i] << endl;
+        }
         CCutil_tri2dat(ncount, edges_val, &dat);
-        free(edges_val);
+        //free(edges_val); // Commented with Saverio
+
+        cout << "After:" << endl;
+        for (int i = 0; i < nedges; i++) {
+            cout << "Edge " << i << ": " << edges_val[i] << endl;
+        }
     } else {
         cout << "Cannot fill edges list!" << endl;
         return make_tuple(1, dummy_ret); // Failure
     }
+
 
     int success;             // int (not pointer) to check status
     int foundtour;           // int (not pointer) to check if tour was found
@@ -59,6 +70,13 @@ tuple<double, vector<int>> solve_tsp(const vector<int>& C, int ncount, int silen
     CCrandstate rstate;
     CCutil_sprand(123, &rstate);
 
+    CCutil_writetsplib("test.tsp", ncount, &dat);
+
+    CCutil_freedatagroup(&dat);
+    CCutil_init_datagroup(&dat);
+
+    CCutil_gettsplib("test.tsp", &ncount, &dat);
+
     // Call the solver
     int out = CCtsp_solve_dat(ncount, &dat, (int*)NULL, tour, (double*)NULL,
                               &optval, &success, &foundtour, name,
@@ -67,6 +85,9 @@ tuple<double, vector<int>> solve_tsp(const vector<int>& C, int ncount, int silen
     if (foundtour) {
         std::cout << "Optimal Value: " << optval << std::endl;
         std::cout << "Tour found!" << std::endl;
+        for (int i = 0; i < ncount; i++) {
+            std::cout << tour[i] << std::endl;
+        }
     }
 
     CCutil_freedatagroup(&dat);
@@ -78,4 +99,22 @@ tuple<double, vector<int>> solve_tsp(const vector<int>& C, int ncount, int silen
         return make_tuple(optval, tour_vec); // Success
     }
     return make_tuple(1, dummy_ret); // Failure
+}
+
+tuple<double, vector<int>> solve_tsp_silent(const vector<int>& C, int ncount) {
+    /**
+     * The previous function but now the stoputput is ona file
+     * */
+
+        FILE* f = fopen("tsp_output.log", "w");
+        int saved_fd = dup(STDOUT_FILENO);   // save real stdout
+        dup2(fileno(f), STDOUT_FILENO);      // point stdout → file
+
+        auto out = solve_tsp(C, ncount, 0);
+
+        fflush(stdout);
+        dup2(saved_fd, STDOUT_FILENO);       // restore
+        close(saved_fd);
+        fclose(f);
+    return out;
 }
