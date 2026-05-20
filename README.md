@@ -36,18 +36,11 @@ The executable `scip` will be in `/usr/bin/`, but we will need headers and libra
 Libraries will be in `usr/lib/` and headers in `/usr/include/`
 
 ## Install Concorde
+⚠️ SO FAR, you do not need it anymore
+
 Highly recommended to follow my tutorial: https://eleonoravercesi.github.io/blogs/Concorde_tutorial.html
 Then, you have to add to the CMake the folder of `concorde.h` and `concorde.a` (the library) to the include and link directories, respectively.
 
 ## TODO List
-- [ ] Fix float vs double (which is better?)
-- [ ] In the gap plus function you need to implement separation of triangle inequality 
-- [ ] Preprocessing of Concorde with LKH3
-- [ ] In gap plus, preprocessing with LKH3
-- [ ] Fix this:
-```cpp
-/home/vercee/Documents/math_prog_extended/include/solvers.h:54:18: warning: ISO C++ forbids converting a string constant to ‘char*’ [-Wwrite-strings]
-   54 |     char* name = "tsp_test";
-      |                  ^~~~~~~~~~
-```
-- [ ] Terrible, you have both variables for c_ij and c_ji
+- [ ] Check wheter the function opt_plus does something correct
+- [ ] Enhance it with LKH3

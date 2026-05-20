@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10) # 4.2 is very high/uncommon, 3.10 is safer
 project(math_prog_extended)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 20) # Use C++17 standard
 
 # 1. Setup PPL
 find_path(PPL_INCLUDE_DIR ppl.hh)
@@ -14,6 +14,7 @@ set(SOURCES
         src/solvers.cpp
         src/readers.cpp
         src/gap_related_functions.cpp
+        src/utils.cpp
 )
 
 # 3. Create the executable using the SOURCES list
@@ -25,7 +26,8 @@ target_include_directories(math_prog_extended PRIVATE
         ${PPL_INCLUDE_DIR}
         /usr/include/
         /home/vercee/libraries/concorde/build
-        /home/vercee/libraries/concorde/cplex
+        # /usr/local/include/lemon
+
 )
 
 # 5. Handle Linking (The -L and -l flags)
@@ -36,6 +38,7 @@ target_link_libraries(math_prog_extended PRIVATE
         /home/vercee/libraries/concorde/cplex/libcplex.a
         m                 # Math library
         pthread           # Thread library (often required by SCIP/CPLEX)
+        # /home/vercee/libraries/lemon-1.3/build/lemon/libemon.a
 )
 
 # 6. Set output name
