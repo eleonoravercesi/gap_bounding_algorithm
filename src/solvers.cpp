@@ -5,7 +5,6 @@
 #include <vector>
 #include <tuple>
 #include "../include/solvers.h"
-
 #include <algorithm>
 #include <iostream>
 #include <fstream>
@@ -43,6 +42,9 @@ tuple<double, vector<pair<int, int>>> solve_tsp_scip(const vector<double>& C, in
     SCIP_CALL_ABORT(SCIPsetRealParam(scip, "numerics/epsilon",    1e-9));
     SCIP_CALL_ABORT(SCIPsetRealParam(scip, "numerics/sumepsilon", 1e-7));
     SCIP_CALL_ABORT(SCIPsetRealParam(scip, "numerics/dualfeastol",1e-9));
+
+    //This might save us?
+    //SCIP_CALL_ABORT(SCIPsetBoolParam(scip, "propagating/symmetry/usedynamicprop", FALSE));
 
     // Suppress output for performance
     if (verbosity == 0) {
@@ -101,12 +103,35 @@ tuple<double, vector<pair<int, int>>> solve_tsp_scip(const vector<double>& C, in
         SCIP_CALL_ABORT(SCIPsolve(scip));
         SCIP_SOL* sol = SCIPgetBestSol(scip);
 
+        if (!sol) {
+            cerr << "Error: No feasible solution found in initial solve\n";
+            for (int e = 0; e < n_edges; ++e) {
+                if (x_vars[e] != nullptr) {
+                    SCIP_CALL_ABORT(SCIPreleaseVar(scip, &x_vars[e]));
+                }
+            }
+            SCIP_CALL_ABORT(SCIPfree(&scip));
+            return make_tuple(0.0, vector<pair<int,int>>());
+        }
+
         // Create adj
         vector<vector<int>> adj;
         for (int e = 0; e < n_edges; ++e) {
             if ((int)SCIPgetSolVal(scip, sol, x_vars[e]) > 0.5) {
                 adj.push_back({edges[e].u, edges[e].v});
             }
+        }
+
+        // Safety check: should have exactly n edges for a valid solution
+        if ((int)adj.size() != n) {
+            cerr << "Error: Initial solve returned " << adj.size() << " edges instead of " << n << "\n";
+            for (int e = 0; e < n_edges; ++e) {
+                if (x_vars[e] != nullptr) {
+                    SCIP_CALL_ABORT(SCIPreleaseVar(scip, &x_vars[e]));
+                }
+            }
+            SCIP_CALL_ABORT(SCIPfree(&scip));
+            return make_tuple(0.0, vector<pair<int,int>>());
         }
 
         // DEBUG
@@ -122,17 +147,26 @@ tuple<double, vector<pair<int, int>>> solve_tsp_scip(const vector<double>& C, in
             // This is stupid, but to me it is not clear which one is better;
             vector<int> S = oneComponent(adj);
 
+            // Safety check: S should not be empty
+            if (S.empty()) {
+                cerr << "Error: oneComponent returned empty set\n";
+                break;
+            }
+
             vector<vector<int>> S_list = {S, {1}};
 
-            if(S_list[0].size() == n) {
+            if((int)S_list[0].size() == n) {
                 break; // Tour
             }
+
+            // Free the model once before adding new constraints
+            SCIP_CALL_ABORT(SCIPfreeTransform(scip));
 
             // Else, add a constr for each S but the last one
             for (int s = 0; s < S_list.size() - 1; ++s) {
                 vector<int> S = S_list[s];
 
-                // DEBUG
+                // // DEBUG
                 // for (int q = 0; q < S.size(); ++q) {
                 //     cout << S[q] << " ";
                 // }
@@ -152,8 +186,6 @@ tuple<double, vector<pair<int, int>>> solve_tsp_scip(const vector<double>& C, in
                     }
                 }
 
-                // Free the model
-                SCIP_CALL_ABORT(SCIPfreeTransform(scip));
 
                 string c_name_S = "subtour_";
                 for (int i = 0; i < S.size(); ++i) {
@@ -178,8 +210,18 @@ tuple<double, vector<pair<int, int>>> solve_tsp_scip(const vector<double>& C, in
 
             // Get the best solution
             sol = SCIPgetBestSol(scip);
+            if (!sol) {
+                cerr << "Error: No feasible solution found after adding subtour constraints\n";
+                for (int e = 0; e < n_edges; ++e) {
+                    if (x_vars[e] != nullptr) {
+                        SCIP_CALL_ABORT(SCIPreleaseVar(scip, &x_vars[e]));
+                    }
+                }
+                SCIP_CALL_ABORT(SCIPfree(&scip));
+                return make_tuple(0.0, vector<pair<int,int>>());
+            }
 
-           // Delet the old adj
+           // Delete the old adj
             adj.clear();
             for (int e = 0; e < n_edges; ++e) {
                 double val = SCIPgetSolVal(scip, sol, x_vars[e]);
@@ -190,6 +232,7 @@ tuple<double, vector<pair<int, int>>> solve_tsp_scip(const vector<double>& C, in
 
             if ((int)adj.size() != n) {
                 cerr << "Bad solution: " << adj.size() << " edges expected " << n << "\n";
+                break;  // Exit loop if solution is malformed
             }
 
             // DEBUG
@@ -199,7 +242,7 @@ tuple<double, vector<pair<int, int>>> solve_tsp_scip(const vector<double>& C, in
             // cout << endl;
 
             // Call the function and store the result
-            // SCIPwriteOrigProblem(scip, "my_model_tsp.lp", "lp", FALSE);
+            SCIPwriteOrigProblem(scip, "my_model_tsp.lp", "lp", FALSE);
 
 
             // DEBUG
@@ -231,8 +274,15 @@ tuple<double, vector<pair<int, int>>> solve_tsp_scip(const vector<double>& C, in
             objval = SCIPgetSolOrigObj(scip, sol); // Easy
             for (int e = 0; e < n_edges; ++e) {
                 if (SCIPgetSolVal(scip, sol, x_vars[e]) >= 1 - TOL) {
-                    edges_here.push_back({edges[e].u, edges[e].v});
+                    edges_here.emplace_back(edges[e].u, edges[e].v);
                 }
+            }
+
+            // Sanity check: tour should have exactly n edges
+            if ((int)edges_here.size() != n) {
+                cerr << "Warning: solve_tsp_scip returning " << edges_here.size() << " edges instead of expected " << n << "\n";
+                edges_here.clear();
+                objval = 0.0;
             }
         } else {
             // No feasible solution: return empty tour and obj 0

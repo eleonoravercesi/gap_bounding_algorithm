@@ -175,16 +175,22 @@ double opt_plus(const vector<double>& x, int n) {
             }
         }
 
-        //DEBUG
-        // for (int e = 0; e < n_edges; ++e) {
-        //     cout << c_star_rounded[e] << ",";
-        // }
-        // cout << endl;
+        // DEBUG
+         //for (int e = 0; e < n_edges; ++e) {
+         //    cout << c_star_rounded[e] << ",";
+         //}
+         // cout << endl;
 
         auto tsp_result = solve_tsp_scip(c_star_rounded, n, 0);
         tsp_val = get<0>(tsp_result);
         vector<pair<int, int>> edges_t;
         edges_t = get<1>(tsp_result); // Indicator vector (1 if edge in tour, 0 otherwise)
+
+        // Check if we got a valid tour with exactly n edges
+        if (edges_t.empty() || (int)edges_t.size() != n) {
+            cerr << "Error: solve_tsp_scip returned invalid tour (got " << edges_t.size() << " edges, expected " << n << ")\n";
+            break;
+        }
 
         // Convergence Check
         if (tsp_val >= 1 - TOL) break;
@@ -196,7 +202,7 @@ double opt_plus(const vector<double>& x, int n) {
         cont++;
         SCIP_CALL(SCIPcreateConsBasicLinear(scip, &tour_cons, c_name, 0, nullptr, nullptr,  1, SCIPinfinity(scip)));
 
-        for (int i = 0; i < n; ++i) {
+        for (size_t i = 0; i < edges_t.size(); ++i) {
             int u = edges_t[i].first;
             int v = edges_t[i].second;
             int e = formula_i_j_e(u, v, n);
@@ -207,7 +213,8 @@ double opt_plus(const vector<double>& x, int n) {
 
 
         // Write the problem as it stands in the "Original" space
-        // SCIP_CALL(SCIPwriteOrigProblem(scip, "my_model.lp", NULL, FALSE) );
+        // DEBUG
+        SCIP_CALL(SCIPwriteOrigProblem(scip, "my_model.lp", NULL, FALSE) );
 
     }
 

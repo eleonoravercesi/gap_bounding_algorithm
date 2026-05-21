@@ -46,7 +46,12 @@ vector<int> oneComponent(vector<vector<int>> adj) {
     // Copy adj to avoid modifying the original
     vector<vector<int>> adj_copy = adj;
 
-    while (true) {
+    // Safeguard: prevent infinite loop
+    int max_iterations = adj.size() + 10;
+    int iterations = 0;
+
+    while (iterations < max_iterations) {
+        iterations++;
         int last_of_S = S.back();
 
         // If we closed the tour back to start, we're done
@@ -78,6 +83,9 @@ vector<int> oneComponent(vector<vector<int>> adj) {
             return S;  // return the partial component as-is
         }
     }
+
+    cerr << "Warning: oneComponent exceeded max iterations, returning partial component\n";
+    return S;
 }
 
 std::vector<int> edges_to_tour(const std::vector<std::pair<int,int>>& edges, int n) {
