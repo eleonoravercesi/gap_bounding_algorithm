@@ -1,7 +1,8 @@
 #include <bits/stdc++.h>
 using namespace std;
 #include <vector>
-using namespace std;
+#include "utils.h"
+#include "GB_algorithm.h"
 
 std::vector<std::vector<int>> getComponents(
     const std::vector<std::vector<int>>& adj)
@@ -24,12 +25,12 @@ std::vector<std::vector<int>> getComponents(
             int u = st.top(); st.pop();
             comp.push_back(u);
 
-            for (int v : adj[u])
-            {
-                if (!visited[v])
+            for (int i = 0; i < n; i++) //Could be here
+            { int v = adj[u][i];
+                if (v == 1 && !visited[i])
                 {
-                    visited[v] = true;
-                    st.push(v);
+                    visited[i] = true;
+                    st.push(i);
                 }
             }
         }
@@ -121,3 +122,130 @@ std::vector<int> edges_to_tour(const std::vector<std::pair<int,int>>& edges, int
     }
     return tour;
 }
+
+int from_i_j_to_e(int i, int j, int n) {
+    int e;
+    e = (n - 2) * i - (i - 1) * (i ) / 2 + j - 1;
+    return e;
+}
+
+string itos(int i) {stringstream s; s << i; return s.str(); }
+
+
+vector<pair<int,int>> delta(
+    const vector<int>& S,
+    const vector<pair<int,int>>& edges
+) {
+    vector<pair<int,int>> result;
+
+    // Get the number of edges here
+    int n_edges = edges.size();
+    int e, i, j;
+
+    for (e = 0; e < n_edges; ++e) {
+        i = edges[e].first;
+        j = edges[e].second;
+
+        int i_in_S = count(S.begin(), S.end(), i);
+        int j_in_S = count(S.begin(), S.end(), j);
+
+        if (i_in_S + j_in_S == 1) {
+            result.push_back(make_pair(i, j));
+        }
+    }
+
+    return result;
+}
+
+/*
+ * @param n Number of nodes (the new node will be node n)
+ * @param x0 Vertex of the SEP polytope
+ * @param e The 1-edge to branch on
+ * @param tol Tolerance for checking if x0[e] == 1
+ * @return a Vertex "expanded"
+ */
+
+using Vertex = map<pair<int, int>, double>;
+using Edge = pair<int, int>;
+
+Vertex bbmove(int n, const Vertex& x0, Edge e, double tol) {
+    Vertex x1;
+
+    // Check that x0[e] == 1 (within tolerance)
+    if (abs(x0.at(e) - 1.0) >= tol) {
+        cout << "Edge e is not a one-edge (x0[e] = " +
+                               to_string(x0.at(e)) + ", expected 1.0). Returning empty vertex";
+        return x1;
+    }
+
+    // Otherwise, Create a copy of x0
+    x1 = x0;
+
+    // For all nodes v in {0, 1, ..., n-1}, set x1[(v, n)] = 0
+    for (int v = 0; v < n; v++) {
+        Edge edge_to_n = make_pair(min(v, n), max(v, n));
+        x1[edge_to_n] = 0.0;
+    }
+
+    // Set x1[e] = 0
+    x1[e] = 0.0;
+
+    // Set x1[(e[0], n)] = 1 and x1[(e[1], n)] = 1
+    Edge edge1 = make_pair(min(e.first, n), max(e.first, n));
+    Edge edge2 = make_pair(min(e.second, n), max(e.second, n));
+
+    x1[edge1] = 1.0;
+    x1[edge2] = 1.0;
+
+    return x1;
+}
+
+/**
+ * Returns the walk(s) obtained extending the walk w
+ * after one application of the bbmove on the 1-edge e.
+ */
+vector<Walk> extend_walk(int n, const Walk& w, Edge e) {
+    vector<Walk> extended_walks;
+
+    // Get multiplicity of edge e in walk w
+    int mult = 0;
+    if (w.count(e) > 0) {
+        mult = w.at(e);
+    }
+
+    // Create edges to new node n
+    Edge edge_e0_n = make_pair(min(e.first, n), max(e.first, n));
+    Edge edge_e1_n = make_pair(min(e.second, n), max(e.second, n));
+
+    if (mult == 0) {
+        // Case 1: Edge e is not used in walk
+        Walk w1 = w;
+        w1.erase(e);
+        w1[edge_e0_n] = 2;
+        if (w1[edge_e1_n] == 0) {
+            w1.erase(edge_e1_n);  // Clean up zero
+        }
+
+        Walk w2 = w;
+        w2.erase(e);
+        if (w2[edge_e0_n] == 0) {
+            w2.erase(edge_e0_n);  // Clean up zero
+        }
+        w2[edge_e1_n] = 2;
+
+        extended_walks.push_back(w1);
+        extended_walks.push_back(w2);
+
+    } else {
+        // Case 2: Edge e is used in walk
+        Walk w1 = w;
+        w1.erase(e);
+        w1[edge_e0_n] = mult;
+        w1[edge_e1_n] = mult;
+
+        extended_walks.push_back(w1);
+    }
+
+    return extended_walks;
+}
+

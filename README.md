@@ -30,16 +30,8 @@ Some LaTeX errors will appear for sure, ignore them (`CTRL + Q`. Then, you have 
 export PPL_INCLUDE_DIR=PPL_INCLUDE_DIR:/path/to/PPL/src/
 ```
 
-## Install SCIP
-First, download the SCIPOpt Optimization Suite: https://scipopt.org/index.php#download and install it.
-The executable `scip` will be in `/usr/bin/`, but we will need headers and libraries. 
-Libraries will be in `usr/lib/` and headers in `/usr/include/`
-
-## Install Concorde
-⚠️ SO FAR, you do not need it anymore
-
-Highly recommended to follow my tutorial: https://eleonoravercesi.github.io/blogs/Concorde_tutorial.html
-Then, you have to add to the CMake the folder of `concorde.h` and `concorde.a` (the library) to the include and link directories, respectively.
+## Install Gurobi
+You can easily follow the instructions. 
 
 ## TODO List
 - [ ] Check wheter the function opt_plus does something correct

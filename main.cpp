@@ -3,31 +3,28 @@
  * "opt_plus" run the opt_plus algorithm on vertices of a given size and produces a file with the maximum gap
  **/
 
-#include <filesystem>
-#include <format>
+
 #include "ppl.hh"
-#include <iostream>
-#include "include/readers.h"
+using namespace std;
 #include <vector>
-#include "utils.h"
-#include "include/gap_related_functions.h"
-#include <string>
+#include "readers.h"
+#include "GB_algorithm.h"
+#include "opt_plus.h"
+#include <format>
 #include <fstream>
 #include <chrono>
-
 #include "solvers.h"
-
-
-using namespace std;
+#include "utils.h"
 using std::chrono::duration;
 
-void opt_plus_on_n(string n) {
-    /** Run opt_plus on the vertices of size n and write the results in a csv file with idx,opt_plus,gap_plus,runtime
-     * idx is the index of the vertex in the list of vertices
-     * opt_plus is the value of opt_plus for that vertex
-     * gap_plus is 1/opt_plus
-     * runtime is the time taken to compute opt_plus for that vertex
-     */
+void opt_plut_test(string n) {
+    // TRUE
+    // string n;
+    // n = argv[1];
+
+    // // DEBUG
+    // string n = "9";
+
     string filename = format("/home/vercee/Documents/math_prog_extended/vertices/vertices{}.txt", n);
     int n_int = stoi(n);
     vector<vector<double>> x_list = read_vertices_chm(filename);
@@ -49,7 +46,7 @@ void opt_plus_on_n(string n) {
 
         // Start opt solution
         auto t1 = std::chrono::high_resolution_clock::now();
-        double opt_plus_val = opt_plus(x_0, n_int);
+        double opt_plus_val = opt_plus(x_0, n_int, 0);
         auto t2 = std::chrono::high_resolution_clock::now();
 
         /* Getting number of milliseconds as a double. */
@@ -65,63 +62,170 @@ void opt_plus_on_n(string n) {
     fout.close();
 }
 
-void test_scip_tsp(string n) {
+void opt_II_test(string n) {
+    // TRUE
+    // string n;
+    // n = argv[1];
+
+    // // DEBUG
+    // string n = "9";
+
+    string filename = format("/home/vercee/Documents/math_prog_extended/vertices/vertices{}.txt", n);
     int n_int = stoi(n);
-    std::vector<double> costs = {
-        0.0833300000000001,0.25,0.25,0,0.0833300000000001,0.125,0.125,0.0833300000000001,0.0833300000000001,
-        0.0833300000000001,0.166670000000001,0.166670000000001,0.0833300000000001,0,0.0416700000000001,
-        0.0416700000000001,0.0833300000000001,0,0.0833300000000001,0,0.25,0.166670000000001,0.125,0.125,
-        0.166670000000001,0.166670000000001,0.166670000000001,0.25,0.166670000000001,0.125,0.125,0.166670000000001,
-        0.166670000000001,0.166670000000001,0.0833300000000001,0.125,0.125,0.0833300000000001,0.0833300000000001,
-        0.0833300000000001,0.0416700000000001,0.0416700000000001,0.0833300000000001,0,0.0833300000000001,0,
-        0.0416700000000001,0.0416700000000001,0.0416700000000001,0.0416700000000001,0.0416700000000001,
-        0.0416700000000001,0.0833300000000001,0,0.0833300000000001
-    };
+    vector<vector<double>> x_list = read_vertices_chm(filename);
 
-    auto out = solve_tsp_scip(costs, n_int, 1);
-    cout << get<0>(out) << endl;
+    // Open a fine to write idx,opt_plus,gap_plus,runtime
+    ofstream fout;
+    fout.open(format("/home/vercee/Documents/math_prog_extended/output/results_opt_II_{}.csv", n));
 
-    vector<pair<int, int>> tour = get<1>(out);
-    for (int i = 0; i < tour.size(); ++i) {
-        cout << tour[i].first << " and " << tour[i].second << endl << " ";
+    // Write the header
+    fout << "idx,opt_plus,gap_plus,runtime\n";
+
+    // Set a high precision so we can recover fractions
+    fout << setprecision(20);
+
+    // For loop on the vectors
+    vector<double> gaps;
+    int t, i, j, e;
+    for (t = 0; t < x_list.size(); ++t) {
+        vector<double> x_0 = x_list[t];
+
+        map<pair<int,int>, double> x_0_dict;
+
+        for (i = 0; i < n_int; ++i) {
+            for (j = i + 1; j < n_int; ++j) {
+                e = from_i_j_to_e(i, j, n_int);
+                if (x_0[e] > 0) {
+                    x_0_dict[make_pair(i,j)] = x_0[e]; // [ ] for insertion, .at for access
+                }
+            }
+        }
+
+
+
+        auto t1 = std::chrono::high_resolution_clock::now();
+        OptIISolution result;
+        vector<Walk> w_start; // empty
+        result = solve_optII(n_int, x_0_dict, w_start, 1e-6, 0);
+        auto t2 = std::chrono::high_resolution_clock::now();
+
+        /* Getting number of milliseconds as a double. */
+        duration<double, std::milli> ms_double = t2 - t1;
+
+        double opt_II_val = result.opt_value;
+        cout << "\t \t \t Gap for vertex " << t << ": " << 1 / opt_II_val << endl;
+        cout << "-----------------------------------" << endl;
+
+        // Now, write on file
+        fout << t << "," << opt_II_val << "," << 1 / opt_II_val << "," << ms_double << "\n";
     }
-    cout << endl;
+    fout.close();
+}
+
+void graph_tsp_test() {
+    std::map<std::pair<int, int>, double> edges;
+    edges[{0, 1}] = 1.0; edges[{1, 2}] = 1.0; edges[{2, 3}] = 1.0;
+    edges[{3, 4}] = 1.0; edges[{4, 5}] = 1.0;
+
+    // Middle Row (6-11)
+    edges[{6, 7}] = 1.0; edges[{7, 8}] = 1.0; edges[{8, 9}] = 1.0;
+    edges[{9, 10}] = 1.0; edges[{10, 11}] = 1.0;
+
+    // Bottom Row (12-17)
+    edges[{12, 13}] = 1.0; edges[{13, 14}] = 1.0; edges[{14, 15}] = 1.0;
+    edges[{15, 16}] = 1.0; edges[{16, 17}] = 1.0;
+
+    // Vertical/Connecting Edges (Weight 2)
+    edges[{0, 6}] = 2.0; edges[{6, 12}] = 2.0; // Left side
+    edges[{5, 11}] = 2.0; edges[{11, 17}] = 2.0; // Right side
+
+    GraphTSPSolution result;
+    result = solve_graph_tsp(18, edges, 2);
 
 }
 
-void test_connected_components() {
-    vector<vector<int>> adj = {
-        {0,3}, {0, 4}, {1, 3}, {1, 7}, {2, 6}, {2, 8}, {4, 5},
-        {5, 7}, {6, 8}
-    };
+void test_BB_move() {
+    int n = 4;
 
-    vector<int> S = oneComponent(adj);
+    Vertex x0; // This is not a vertex but I do not care at this stage
+    x0[{0, 1}] = 1.0;
+    x0[{0, 2}] = 0.5;
+    x0[{0, 3}] = 1.0;
+    x0[{1, 2}] = 0.5;
+    x0[{1, 3}] = 0.0;
+    x0[{2, 3}] = 0.0;
 
-    for (size_t i = 0; i < S.size(); ++i) {
-        cout << S[i] << " ";
+    Edge e = {0, 1};
+    Vertex x1 = bbmove(n, x0, e);
+
+    // Print x1
+    int i, j;
+    for (i = 0; i < n + 1; ++i) {
+        for (j = i + 1; j < n + 1 ; ++j) {
+            cout << i << " , " << j << " --> " << x1[{i, j}] << endl;
+        }
     }
-    cout << endl;
-
-
 }
 
-int main(int argc, char *argv[]){
-    // string what_to_run = argv[1];
-    // string n = argv[2];
+void gb_test(string k) {
+    // Here, k is from 3 onward!!
 
-    //string what_to_run = "tsp_example";
-    string what_to_run = "opt_plus";
-    //string what_to_run = "connected_components";
-    string n = "12";
+    string filename = format("/home/vercee/Documents/math_prog_extended/ancestors/ancestors_{}.csv", k);
+    vector<pair<int, vector<double> > > x_list;
+    x_list = read_ancestors(filename);
+
+    // Open a fine to write idx,opt_plus,gap_plus,runtime
+    ofstream fout;
+    fout.open(format("/home/vercee/Documents/math_prog_extended/output/results_GBe_{}.csv", k));
+
+    // Write the header
+    fout << "n,gapII,family_gapII,iterations,runtime\n";
+
+    // Set a high precision so we can recover fractions
+    fout << setprecision(20);
+
+    // For loop on the vectors
+    int t, i, j, e;
+    for (t = 0; t < x_list.size(); ++t) {
+        vector<double> x_0 = x_list[t].second;
+        int n_int = x_list[t].first;
+
+        map<pair<int,int>, double> x_0_dict;
+
+        for (i = 0; i < n_int; ++i) {
+            for (j = i + 1; j < n_int; ++j) {
+                e = from_i_j_to_e(i, j, n_int);
+                if (x_0[e] > 0) {
+                    x_0_dict[make_pair(i,j)] = x_0[e]; // [ ] for insertion, .at for access
+                }
+            }
+        }
 
 
-    if (what_to_run == "opt_plus") {
-        opt_plus_on_n(n);
+        auto t1 = std::chrono::high_resolution_clock::now();
+        GBAlgorithmResult result;
+        vector<Walk> w_start;
+
+        double target_gap = 4.0/3.0;
+        result = GBe_algorithm(n_int, x_0_dict, target_gap, 20, 1e-6, 0);
+        auto t2 = std::chrono::high_resolution_clock::now();
+
+        /* Getting number of milliseconds as a double. */
+        duration<double, std::milli> ms_double = t2 - t1;
+
+        double gap_II_val = result.gapII;
+        double family_gap = result.family_gapII;
+        cout << "Done with " << t << " out of " << x_list.size() << " with family gap " << family_gap << endl;
+
+        int iterations = result.iterations;
+
+        // Now, write on file
+        fout << n_int << "," << gap_II_val << "," << family_gap << "," << iterations << ","  << ms_double << "\n";
     }
-    else if (what_to_run == "tsp_example") {
-        test_scip_tsp(n);
-    }
-    else if (what_to_run == "connected_components") {
-        test_connected_components();
-    }
+    fout.close();
+}
+
+
+int main(int argc, char *argv[]) {
+    gb_test("7");
 }

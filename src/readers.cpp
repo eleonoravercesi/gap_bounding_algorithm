@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <sstream>
+#include <cassert>
 
 using namespace std;
 
@@ -24,7 +25,6 @@ vector<vector<double>> read_vertices_chm(const string& filename) {
         stringstream ss(line);
         string token;
 
-        // This correctly splits the line by spaces
         while (ss >> token) {
             size_t slash_pos = token.find('/');
             if (slash_pos != string::npos) {
@@ -46,4 +46,47 @@ vector<vector<double>> read_vertices_chm(const string& filename) {
         }
     }
     return vertices;
+}
+
+vector<pair<int, vector<double>>> read_ancestors(const string& filename) {
+    vector<pair<int, vector<double>>> ancestors;
+    ifstream vertices_file(filename);
+    string line;
+
+    // Skip the header line: "n,xi"
+    if (!getline(vertices_file, line)) return ancestors;
+
+    while (getline(vertices_file, line)) {
+        if (line.empty()) continue;
+
+        // Use stringstream to split by comma
+        stringstream ss(line);
+        string id_str, values_str;
+
+        // Get everything before the comma (ID) and after (the values)
+        if (getline(ss, id_str, ',') && getline(ss, values_str)) {
+            int n = stoi(id_str);
+            vector<double> vertex;
+            stringstream val_ss(values_str);
+            string token;
+
+            while (val_ss >> token) {
+                size_t slash_pos = token.find('/');
+                if (slash_pos != string::npos) {
+                    double num = stod(token.substr(0, slash_pos));
+                    double den = stod(token.substr(slash_pos + 1));
+                    vertex.push_back(num / den);
+                } else {
+                    vertex.push_back(stod(token));
+                }
+            }
+
+            // Consistent check: number of edges m = n*(n-1)/2
+            int m = n * (n - 1) / 2;
+            assert(m == vertex.size());
+
+            ancestors.push_back({n, vertex});
+        }
+    }
+    return ancestors;
 }

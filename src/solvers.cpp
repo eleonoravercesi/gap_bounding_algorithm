@@ -1,302 +1,550 @@
-/*
- * A list of solvers we might need
- */
+/* This has been created starting from https://docs.gurobi.com/projects/examples/en/current/examples/cpp/tsp_c++.html
+ * and using the LLM Gurobot to adapt it to my needs
+ **/
 
+#include "gurobi_c++.h"
 #include <vector>
-#include <tuple>
-#include "../include/solvers.h"
-#include <algorithm>
 #include <iostream>
-#include <fstream>
-#include "scip/scip.h"
-#include "scip/scipdefplugins.h"
-#include <format>
-#include <ppl.hh>
-
-#include "utils.h"
+#include <cassert>
+#include <sstream>
 using namespace std;
+#include "utils.h"
+#include <map>
 
+
+// Structure to hold the solution
+struct TSPSolution {
+    vector<pair<int, int>> tour_edges;  // List of edges in the tour
+    double tour_value;                   // Total cost of the tour
+    bool success;                        // Whether a solution was found
+};
+
+// Forward declarations
+void findsubtour(int n, double** sol, int* tourlenP, int* tour);
+
+// Subtour elimination callback - CORRECTED VERSION
+class subtourelim: public GRBCallback
+{
+  public:
+    GRBVar** vars;
+    int n;
+    subtourelim(GRBVar** xvars, int xn) {
+      vars = xvars;
+      n    = xn;
+    }
+  protected:
+    void callback() {
+        try {
+            if (where == GRB_CB_MIPSOL) {
+                double **x = new double*[n];
+                int *tour = new int[n];
+                int len;
+
+                // Get solution values - now safe because diagonal exists
+                for (int i = 0; i < n; i++)
+                    x[i] = getSolution(vars[i], n);
+
+                findsubtour(n, x, &len, tour);
+
+                if (len < n) {
+                    // Add subtour elimination constraint
+                    GRBLinExpr expr = 0;
+                    for (int i = 0; i < len; i++) {
+                        for (int j = i+1; j < len; j++) {
+                            int node_i = tour[i];
+                            int node_j = tour[j];
+
+                            // Use canonical order (smaller index first)
+                            int u = (node_i < node_j) ? node_i : node_j;
+                            int v = (node_i < node_j) ? node_j : node_i;
+
+                            expr += vars[u][v];
+                        }
+                    }
+                    addLazy(expr <= len-1);
+                }
+
+                for (int i = 0; i < n; i++)
+                    delete[] x[i];
+                delete[] x;
+                delete[] tour;
+            }
+        } catch (GRBException& e) {
+            cerr << "Callback Error " << e.getErrorCode() << ": " << e.getMessage() << endl;
+        } catch (...) {
+            cerr << "Unknown error during callback" << endl;
+        }
+    }
+};
+
+// Given an integer-feasible solution 'sol', find the smallest sub-tour
+void findsubtour(int n, double** sol, int* tourlenP, int* tour)
+{
+  bool* seen = new bool[n];
+  int bestind, bestlen;
+  int i, node, len, start;
+
+  for (i = 0; i < n; i++)
+    seen[i] = false;
+
+  start = 0;
+  bestlen = n+1;
+  bestind = -1;
+
+  while (start < n) {
+    for (node = 0; node < n; node++)
+      if (!seen[node])
+        break;
+    if (node == n)
+      break;
+
+    for (len = 0; len < n; len++) {
+      tour[start+len] = node;
+      seen[node] = true;
+      for (i = 0; i < n; i++) {
+        if (sol[node][i] > 0.5 && !seen[i]) {
+          node = i;
+          break;
+        }
+      }
+      if (i == n) {
+        len++;
+        if (len < bestlen) {
+          bestlen = len;
+          bestind = start;
+        }
+        start += len;
+        break;
+      }
+    }
+  }
+
+  for (i = 0; i < bestlen; i++)
+    tour[i] = tour[bestind+i];
+  *tourlenP = bestlen;
+
+  delete[] seen;
+}
 
 /**
- * Just a simple solver for TSP. Hopefully, it will not break.
- *      @param C: vector<double> the cost vector of size n*(n-1)/2, where C[e] is the cost of edge (i,j) for i < j. Lex order
- *      @param n : int, the nuber of nodes
- *      @param verbosity: int,  = 0 --> Quite, > 0, verbpse
+ * Solves the Traveling Salesman Problem
  *
- *      @return tps_vale: double, the tsp value
- *      @return tour: vector<int> containing the nodes
- * */
-tuple<double, vector<pair<int, int>>> solve_tsp_scip(const vector<double>& C, int n, int verbosity) {
-    double TOL = 0.000001;
-    SCIP* scip = nullptr;
-    SCIP_CALL_ABORT(SCIPcreate(&scip));
-    SCIP_CALL_ABORT(SCIPincludeDefaultPlugins(scip));
-    SCIP_CALL_ABORT(SCIPcreateProbBasic(scip, "TSP_solver"));
+ * @param n Number of nodes
+ * @param C Vector of costs for upper triangle (size = n*(n-1)/2)
+ *          Order: (0,1), (0,2), ..., (0,n-1), (1,2), (1,3), ..., (n-2,n-1)
+ * @param verbosity Verbosity level:
+ *          0 --> Completely silent
+ *          1 --> Only custom printing
+ *          2 --> Everything
+ * @return TSPSolution containing tour edges and total cost
+ */
+TSPSolution solve_tsp(int n, const vector<double>& C, int verbosity) {
 
-    // Should resolve tolerance issue... yes.
-    // After SCIPcreateProbBasic, add:
-    SCIP_CALL_ABORT(SCIPsetIntParam(scip, "presolving/maxrounds", 0)); // disable presolve
-    SCIP_CALL_ABORT(SCIPsetIntParam(scip, "lp/solvefreq", 1));         // solve LP at every node
-    // Tighten numerical tolerances
-    SCIP_CALL_ABORT(SCIPsetRealParam(scip, "numerics/feastol",    1e-9));
-    SCIP_CALL_ABORT(SCIPsetRealParam(scip, "numerics/epsilon",    1e-9));
-    SCIP_CALL_ABORT(SCIPsetRealParam(scip, "numerics/sumepsilon", 1e-7));
-    SCIP_CALL_ABORT(SCIPsetRealParam(scip, "numerics/dualfeastol",1e-9));
+    TSPSolution result;
+    result.success = false;
+    result.tour_value = 0.0;
 
-    //This might save us?
-    //SCIP_CALL_ABORT(SCIPsetBoolParam(scip, "propagating/symmetry/usedynamicprop", FALSE));
-
-    // Suppress output for performance
-    if (verbosity == 0) {
-        SCIPsetIntParam(scip, "display/verblevel", verbosity);
+    int expected_size = n * (n - 1) / 2;
+    if (C.size() != expected_size) {
+        cerr << "Error: Expected " << expected_size << " cost values, got " << C.size() << endl;
+        return result;
     }
 
-    // Create Edges Mapping (i < j)
-    struct Edge { int u, v; };
-    std::vector<Edge> edges;
-    for (int i = 0; i < n; ++i) {
-        for (int j = i + 1; j < n; ++j) {
-            edges.push_back({i, j});
+    GRBEnv *env = NULL;
+    GRBVar **vars = NULL;
+
+    vars = new GRBVar*[n];
+    for (int i = 0; i < n; i++)
+        vars[i] = new GRBVar[n];
+
+    try {
+        //  Create empty environment**
+        env = new GRBEnv(true);
+
+        //  Set output flag on environment before starting**
+        if (verbosity < 2) {
+            env->set(GRB_IntParam_OutputFlag, 0);
         }
-    }
-    int n_edges = edges.size();
-    assert(n_edges == n * (n - 1) / 2);
 
+        //  Start environment (now silently)**
+        env->start();
 
-    // Create Variables (x_e)
-    std::vector<SCIP_VAR*> x_vars(n_edges);
-    for (int e = 0; e < n_edges; ++e) {
-        char vname[32];
-        snprintf(vname, sizeof(vname), "x_%d_%d", edges[e].u, edges[e].v);
-        // Objective is sum(x[e] * c[e])
-        SCIP_CALL_ABORT(SCIPcreateVarBasic(scip, &x_vars[e], vname, 0.0, 1, C[e], SCIP_VARTYPE_BINARY));
-        SCIP_CALL_ABORT(SCIPaddVar(scip, x_vars[e]));
-    }
+        GRBModel model = GRBModel(*env);
 
-    // Degree constraints
-    for (int i = 0; i < n; ++i) {
-        const char* c_name = format("deg_{}", i).c_str();
-        SCIP_CONS* cons = nullptr;
-        // Collect edges incident to node i
-        std::vector<SCIP_VAR*> vars;
-        std::vector<double>    coefs;
-        for (int e = 0; e < n_edges; ++e) {
-            if (edges[e].u == i || edges[e].v == i) {
-                vars.push_back(x_vars[e]);
-                coefs.push_back(1.0);
+        model.set(GRB_IntParam_LazyConstraints, 1);
+
+        //  Create ALL variables including diagonal
+        int cont = 0;
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                if (i == j) {
+                    // Create diagonal variable with cost 0 and upper bound 0
+                    vars[i][j] = model.addVar(0.0, 0.0, 0.0, GRB_BINARY, "x_"+itos(i)+"_"+itos(j));
+                } else if (i < j) {
+                    // Upper triangle: use cost from C
+                    vars[i][j] = model.addVar(0.0, 1.0, C[cont], GRB_BINARY, "x_"+itos(i)+"_"+itos(j));
+                    cont++;
+                } else {
+                    // Lower triangle: point to corresponding upper triangle variable
+                    vars[i][j] = vars[j][i];
+                }
             }
         }
 
+        // Degree-2 constraints: each node has exactly 2 incident edges
+        for (int i = 0; i < n; i++) {
+            GRBLinExpr expr = 0;
+            for (int j = 0; j < n; j++) {
+                if (i != j) {
+                    expr += vars[i][j];
+                }
+            }
+            model.addConstr(expr == 2, "deg2_"+itos(i));
+        }
 
-        // lhs == rhs == 2.0 for equality
-        SCIP_CALL_ABORT(SCIPcreateConsBasicLinear(
-            scip, &cons, c_name,
-            (int)vars.size(), vars.data(), coefs.data(),
-            2.0,   // lhs
-            2.0    // rhs
-        ));
-        SCIP_CALL_ABORT(SCIPaddCons(scip, cons));
-        SCIP_CALL_ABORT(SCIPreleaseCons(scip, &cons));
-    }
+        // Set callback
+        subtourelim cb(vars, n);
+        model.setCallback(&cb);
 
         // Optimize
-        SCIP_CALL_ABORT(SCIPsolve(scip));
-        SCIP_SOL* sol = SCIPgetBestSol(scip);
+        model.optimize();
 
-        if (!sol) {
-            cerr << "Error: No feasible solution found in initial solve\n";
-            for (int e = 0; e < n_edges; ++e) {
-                if (x_vars[e] != nullptr) {
-                    SCIP_CALL_ABORT(SCIPreleaseVar(scip, &x_vars[e]));
-                }
-            }
-            SCIP_CALL_ABORT(SCIPfree(&scip));
-            return make_tuple(0.0, vector<pair<int,int>>());
-        }
-
-        // Create adj
-        vector<vector<int>> adj;
-        for (int e = 0; e < n_edges; ++e) {
-            if ((int)SCIPgetSolVal(scip, sol, x_vars[e]) > 0.5) {
-                adj.push_back({edges[e].u, edges[e].v});
-            }
-        }
-
-        // Safety check: should have exactly n edges for a valid solution
-        if ((int)adj.size() != n) {
-            cerr << "Error: Initial solve returned " << adj.size() << " edges instead of " << n << "\n";
-            for (int e = 0; e < n_edges; ++e) {
-                if (x_vars[e] != nullptr) {
-                    SCIP_CALL_ABORT(SCIPreleaseVar(scip, &x_vars[e]));
-                }
-            }
-            SCIP_CALL_ABORT(SCIPfree(&scip));
-            return make_tuple(0.0, vector<pair<int,int>>());
-        }
-
-        // DEBUG
-        // for (int e = 0; e < adj.size(); ++e) {
-        //     cout << adj[e][0] << " " << adj[e][1] << " -- ";
-        // }
-        // cout << endl;
-
-
-        int cont_sec = 0;
-        while (true) {
-            //vector<vector<int>> S_list = getComponents(adj);
-            // This is stupid, but to me it is not clear which one is better;
-            vector<int> S = oneComponent(adj);
-
-            // Safety check: S should not be empty
-            if (S.empty()) {
-                cerr << "Error: oneComponent returned empty set\n";
-                break;
-            }
-
-            vector<vector<int>> S_list = {S, {1}};
-
-            if((int)S_list[0].size() == n) {
-                break; // Tour
-            }
-
-            // Free the model once before adding new constraints
-            SCIP_CALL_ABORT(SCIPfreeTransform(scip));
-
-            // Else, add a constr for each S but the last one
-            for (int s = 0; s < S_list.size() - 1; ++s) {
-                vector<int> S = S_list[s];
-
-                // // DEBUG
-                // for (int q = 0; q < S.size(); ++q) {
-                //     cout << S[q] << " ";
-                // }
-                // cout << endl;
-
-                // Add SEC for set S
-                SCIP_CONS* cons = nullptr;
-                // Collect edges incident to node i
-                std::vector<SCIP_VAR*> vars;
-                std::vector<double>    coefs;
-                for (int e = 0; e < n_edges; ++e) {
-                    int u_in_S =  count(S.begin(), S.end(), edges[e].u);
-                    int v_in_S =  count(S.begin(), S.end(), edges[e].v);
-                    if (u_in_S +  v_in_S == 2) {
-                        vars.push_back(x_vars[e]);
-                        coefs.push_back(1.0);
+        // Extract solution
+        if (model.get(GRB_IntAttr_SolCount) > 0) {
+            // Get solution values
+            double **sol = new double*[n];
+            for (int i = 0; i < n; i++) {
+                sol[i] = new double[n];
+                for (int j = 0; j < n; j++) {
+                    if (i == j) {
+                        sol[i][j] = 0.0;  // Diagonal is always 0
+                    } else {
+                        sol[i][j] = vars[i][j].get(GRB_DoubleAttr_X);
                     }
                 }
-
-
-                string c_name_S = "subtour_";
-                for (int i = 0; i < S.size(); ++i) {
-                    c_name_S += to_string(S[i]) + "_";
-                }
-                cont_sec++;
-                SCIP_CALL_ABORT(SCIPcreateConsBasicLinear(
-                scip, &cons, c_name_S.c_str(),
-                (int)vars.size(), vars.data(), coefs.data(),
-                0,   // lhs
-                (double)(S.size() - 1)    // rhs
-            ));
-                S.clear();
-
-                // Actually add the cons
-                SCIP_CALL_ABORT(SCIPaddCons(scip, cons));
-                SCIP_CALL_ABORT(SCIPreleaseCons(scip, &cons));
             }
 
-            // Solve the problem with all the |S_list| - 1 constr
-            SCIP_CALL_ABORT(SCIPsolve(scip));
+            int* tour = new int[n];
+            int len;
 
-            // Get the best solution
-            sol = SCIPgetBestSol(scip);
-            if (!sol) {
-                cerr << "Error: No feasible solution found after adding subtour constraints\n";
-                for (int e = 0; e < n_edges; ++e) {
-                    if (x_vars[e] != nullptr) {
-                        SCIP_CALL_ABORT(SCIPreleaseVar(scip, &x_vars[e]));
+            findsubtour(n, sol, &len, tour);
+
+            // Check if valid tour
+            if (len != n) {
+                cerr << "ERROR: Found subtour of length " << len << " instead of " << n << endl;
+                cerr << "Cost vector: ";
+                for (size_t e = 0; e < C.size(); e++) {
+                    cerr << C[e] << ",";
+                }
+                cerr << endl;
+
+                // Still return the partial result for debugging
+                result.success = false;
+                result.tour_value = model.get(GRB_DoubleAttr_ObjVal);
+            } else {
+                // Extract edges from the tour
+                for (int i = 0; i < len; i++) {
+                    int from = tour[i];
+                    int to = tour[(i + 1) % len];
+                    result.tour_edges.push_back(make_pair(min(from, to), max(from, to)));
+                }
+
+                // Get objective value
+                result.tour_value = model.get(GRB_DoubleAttr_ObjVal);
+                result.success = true;
+
+                // Print results
+                if (verbosity >= 1) {
+                    cout << "==================================" << endl;
+                    cout << "TSP Solution Found" << endl;
+                    cout << "==================================" << endl;
+                    cout << "Tour value: " << result.tour_value << endl;
+                    cout << "Tour sequence: ";
+                    for (int i = 0; i < len; i++)
+                        cout << tour[i] << " ";
+                    cout << endl;
+
+                    cout << "Tour edges: ";
+                    for (const auto& edge : result.tour_edges) {
+                        cout << "(" << edge.first << "," << edge.second << ") ";
                     }
-                }
-                SCIP_CALL_ABORT(SCIPfree(&scip));
-                return make_tuple(0.0, vector<pair<int,int>>());
-            }
-
-           // Delete the old adj
-            adj.clear();
-            for (int e = 0; e < n_edges; ++e) {
-                double val = SCIPgetSolVal(scip, sol, x_vars[e]);
-                int rounded = (val > 0.5) ? 1 : 0;  // hard clamp, no epsilon needed
-                if (rounded == 1)
-                    adj.push_back({edges[e].u, edges[e].v});
-            }
-
-            if ((int)adj.size() != n) {
-                cerr << "Bad solution: " << adj.size() << " edges expected " << n << "\n";
-                break;  // Exit loop if solution is malformed
-            }
-
-            // DEBUG
-            // for (int e = 0; e < adj.size(); ++e) {
-            //     cout << adj[e][0] << " " << adj[e][1] << " -- ";
-            // }
-            // cout << endl;
-
-            // Call the function and store the result
-            SCIPwriteOrigProblem(scip, "my_model_tsp.lp", "lp", FALSE);
-
-
-            // DEBUG
-            // for (int e = 0; e < n_edges; ++e) {
-            //         cout << C[e] << ", ";
-            //     }
-            //     cout << endl;
-
-            // DEBUG
-            // for (int e = 0; e < n_edges; ++e) {
-            //     // Get the value of the VARIABLE
-            //     cout << SCIPgetSolVal(scip, sol, x_vars[e]) << " ";
-            // }
-            // cout << endl;
-
-        }
-
-        // Write the model so far
-        // SCIP_CALL_ABORT( SCIPwriteOrigProblem(scip, "my_model_tsp.lp", "lp", FALSE) );
-
-
-        // At the end of the day, we should hve a tour
-        // I want the tour and the TSP value
-        sol = SCIPgetBestSol(scip);
-        double objval = 0.0;
-        vector<pair<int,int>> edges_here;
-
-        if (sol) {
-            objval = SCIPgetSolOrigObj(scip, sol); // Easy
-            for (int e = 0; e < n_edges; ++e) {
-                if (SCIPgetSolVal(scip, sol, x_vars[e]) >= 1 - TOL) {
-                    edges_here.emplace_back(edges[e].u, edges[e].v);
+                    cout << endl;
+                    cout << "==================================" << endl;
                 }
             }
 
-            // Sanity check: tour should have exactly n edges
-            if ((int)edges_here.size() != n) {
-                cerr << "Warning: solve_tsp_scip returning " << edges_here.size() << " edges instead of expected " << n << "\n";
-                edges_here.clear();
-                objval = 0.0;
-            }
+            // Cleanup
+            for (int i = 0; i < n; i++)
+                delete[] sol[i];
+            delete[] sol;
+            delete[] tour;
         } else {
-            // No feasible solution: return empty tour and obj 0
-            objval = 0.0;
+            cerr << "No solution found!" << endl;
         }
 
-        // Cleanup: release variables and free SCIP
-        for (int e = 0; e < n_edges; ++e) {
-            if (x_vars[e] != nullptr) {
-                SCIP_CALL_ABORT(SCIPreleaseVar(scip, &x_vars[e]));
+    } catch (GRBException e) {
+        cerr << "Gurobi Error " << e.getErrorCode() << ": " << e.getMessage() << endl;
+    } catch (...) {
+        cerr << "Error during optimization" << endl;
+    }
+
+    // Cleanup
+    for (int i = 0; i < n; i++)
+        delete[] vars[i];
+    delete[] vars;
+    delete env;
+
+    return result;
+}
+
+/**
+ ************************* GraphTSP  *************************
+ **/
+
+// struct to hold the Graphic TSP solution
+struct GraphTSPSolution {
+    vector<pair<pair<int, int>, int>> walk_edges;
+    vector<int> node_multiplicities;
+    double tour_value;
+    bool success;
+};
+
+/**
+ * Solves the Graph Traveling Salesman Problem
+ *
+ * @param n Number of nodes
+ * @param C Vector of costs for upper triangle (size = n*(n-1)/2)
+ *          Order: (0,1), (0,2), ..., (0,n-1), (1,2), (1,3), ..., (n-2,n-1)
+ * @param verbosity Verbosity level:
+ *          0 = silent
+ *          1 = basic output, custom printing
+ *          2 = full Gurobi output
+ * @return GraphTSPSolution containing walk edges with multiplicities and total cost
+ */
+GraphTSPSolution solve_graph_tsp(
+    int n,
+    const map<pair<int,int>, double>& edge_costs,
+    int verbosity
+) {
+    GraphTSPSolution result;
+    result.success = false;
+    result.tour_value = 0.0;
+
+    if (edge_costs.empty()) {
+        cerr << "Error: No edges provided" << endl;
+        return result;
+    }
+
+    try {
+        // Create environment
+        GRBEnv env = GRBEnv(true);
+        if (verbosity < 2) {
+            env.set(GRB_IntParam_OutputFlag, 0);
+            env.set(GRB_IntParam_LogToConsole, 0);
+        }
+        env.start();
+
+        // Create model
+        GRBModel model = GRBModel(env);
+
+        // Get list of edges
+        vector<pair<int,int>> edge_list;
+        for (const auto& [edge, cost] : edge_costs) {
+            edge_list.push_back(edge);
+        }
+
+        // Variables x[e] for each edge (integer, 0 to 2)
+        map<pair<int,int>, GRBVar> x;
+        for (const auto& e : edge_list) {
+            double cost = edge_costs.at(e);
+            x[e] = model.addVar(0.0, 2.0, cost, GRB_INTEGER,
+                               "x_" + to_string(e.first) + "_" + to_string(e.second));
+        }
+
+        // Variables d[i] for each node (integer, >= 1)
+        map<int, GRBVar> d;
+        for (int i = 0; i < n; i++) {
+            d[i] = model.addVar(1.0, GRB_INFINITY, 0.0, GRB_INTEGER, "d_" + to_string(i));
+        }
+
+        // Degree constraints: sum(x[e] for e in delta({v})) == 2 * d[v]
+        for (int v = 0; v < n; v++) {
+            GRBLinExpr expr = 0;
+            vector<int> v_set = {v};
+            vector<pair<int,int>> incident = delta(v_set, edge_list);
+
+            for (const auto& e : incident) {
+                expr += x[e];
+            }
+
+            model.addConstr(expr == 2 * d[v], "node_deg_" + to_string(v));
+        }
+
+        // Set objective
+        GRBLinExpr obj = 0;
+        for (const auto& e : edge_list) {
+            obj += edge_costs.at(e) * x[e];
+        }
+        model.setObjective(obj, GRB_MINIMIZE);
+
+        // Initial optimization
+        if (verbosity >= 1) {
+            cout << "Initial optimization..." << endl;
+        }
+        model.optimize();
+
+        if (model.get(GRB_IntAttr_Status) != GRB_OPTIMAL) {
+            cerr << "Initial optimization failed" << endl;
+            return result;
+        }
+
+        vector<vector<int>> adj(n, vector<int>(n, 0));  // Initialize with zeros
+
+        for (int i = 0; i < n; i++) {
+            for (int j = i + 1; j < n; j++) {
+                pair<int,int> edge = make_pair(i, j);
+
+                // Check if edge exists in the graph
+                if (x.count(edge) > 0 && x[edge].get(GRB_DoubleAttr_X) > 1e-6) {
+                    adj[i][j] = 1;
+                    adj[j][i] = 1;  // Symmetric
+                }
             }
         }
 
-        SCIP_CALL_ABORT(SCIPfree(&scip));
+        // Get connected components
+        vector<vector<int>> components = getComponents(adj);
 
-        return make_tuple(objval, edges_here);
+        if (verbosity >= 1) {
+            cout << "  Now " << components.size() << " component(s)" << endl;
+            cout << "x at this stage" << endl;
+            for (auto& e : edge_list) {
+                cout << e.first << " " << e.second << " " << x[e].get(GRB_DoubleAttr_X) << endl;
+            }
+            cout << "Adj at this stage:" << endl;
+            for (int i = 0; i < n; i++) {
+                for (int j = 0; j < n; j++) {
+                    cout << adj[i][j] << " ";
+                }
+                cout << endl;
+            }
+            for (int i = 0; i < components.size(); i++) {
+                vector<int> S_int = components[i];
+                for (int j = 0; j < S_int.size(); j++) {
+                    cout << S_int[j] << " ";
+                }
+                cout << endl;
+            }
+
+        }
+
+        // Iteratively add subtour elimination constraints
+        int iter = 0;
+        while (components.size() > 1) {
+            iter++;
+
+            if (verbosity >= 1) {
+                cout << "Iteration = " << iter << endl;
+            }
+
+            // Add a constraint for EVERY S
+            for (int i = 0; i < components.size(); i++) {
+                vector<int> S = components[i];
+                GRBLinExpr expr = 0;
+                vector<pair<int,int>> cut_edges = delta(S, edge_list);
+
+                for (const auto& e : cut_edges) {
+                    expr += x[e];
+                }
+
+                model.addConstr(expr >= 2, "sub_el_" + to_string(iter) +  "_" + to_string(i));
+            }
+
+            // Add constraint: sum(x[e] for e in delta(S)) >= 2
+
+
+            // Re-optimize
+            model.optimize();
+
+            if (model.get(GRB_IntAttr_Status) != GRB_OPTIMAL) {
+                cerr << "Optimization failed at iteration " << iter << endl;
+                return result;
+            }
+
+            adj.assign(n, vector<int>(n, 0));  // Reset to all zeros
+
+            for (int i = 0; i < n; i++) {
+                for (int j = i + 1; j < n; j++) {
+                    pair<int,int> edge = make_pair(i, j);
+
+                    // Check if edge exists in the graph
+                    if (x.count(edge) > 0 && x[edge].get(GRB_DoubleAttr_X) > 1e-6) {
+                        adj[i][j] = 1;
+                        adj[j][i] = 1;  // Symmetric
+                    }
+                }
+            }
+
+            // Recompute components
+            components = getComponents(adj);
+
+            if (verbosity >= 1) {
+                cout << "  Now " << components.size() << " component(s)" << endl;
+                cout << "x at this stage" << endl;
+                for (auto& e : edge_list) {
+                    cout << e.first << " " << e.second << " " << x[e].get(GRB_DoubleAttr_X) << endl;
+                }
+                cout << "Adj at this stage:" << endl;
+                for (int i = 0; i < n; i++) {
+                    for (int j = 0; j < n; j++) {
+                        cout << adj[i][j] << " ";
+                    }
+                    cout << endl;
+                }
+                for (int i = 0; i < components.size(); i++) {
+                    vector<int> S_int = components[i];
+                    for (int j = 0; j < S_int.size(); j++) {
+                        cout << S_int[j] << " ";
+                    }
+                    cout << endl;
+                }
+            }
+        }
+
+        // Extract final solution
+        result.success = true;
+        result.tour_value = model.get(GRB_DoubleAttr_ObjVal);
+
+        // Get node multiplicities
+        result.node_multiplicities.resize(n);
+        for (int i = 0; i < n; i++) {
+            result.node_multiplicities[i] = static_cast<int>(d[i].get(GRB_DoubleAttr_X));
+        }
+
+        // Get edges with multiplicities
+        for (const auto& e : edge_list) {
+            double value = x[e].get(GRB_DoubleAttr_X);
+            if (value > 0.5) {  // Changed: only include if used
+                result.walk_edges.push_back({e, static_cast<int>(value)});
+            }
+        }
+
+        if (verbosity >= 1) {
+            cout << "\n==================================\n";
+            cout << "Graph TSP Solution Found\n";
+            cout << "==================================\n";
+            cout << "Tour value: " << result.tour_value << endl;
+            cout << "==================================\n";
+        }
+
+    } catch (GRBException& e) {
+        cerr << "Gurobi Error " << e.getErrorCode() << ": " << e.getMessage() << endl;
+    } catch (...) {
+        cerr << "Unknown error during optimization" << endl;
+    }
+
+    return result;
 }
+
+
+
