@@ -55,41 +55,6 @@ message(STATUS "PPL include dir: ${PPL_INCLUDE_DIR}")
 
 
 # ======================
-# Setup Nauty
-# ======================
-## TODO this is ugly but what I am suppose to do? which nauty does not work
-#set(NAUTY_DIR "/home/vercee/libraries/nauty2_9_3")
-#
-#find_path(NAUTY_INCLUDE_DIR nauty.h
-#        PATHS ${NAUTY_DIR}
-#        NO_DEFAULT_PATH
-#)
-#
-#find_library(NAUTY_LIBRARY NAMES nauty
-#        PATHS ${NAUTY_DIR}
-#        PATH_SUFFIXES lib
-#        NO_DEFAULT_PATH
-#)
-#
-## If not found as library, check for object file
-#if(NOT NAUTY_LIBRARY)
-#    if(EXISTS "${NAUTY_DIR}/nauty.a")
-#        set(NAUTY_LIBRARY "${NAUTY_DIR}/nauty.a")
-#    elseif(EXISTS "${NAUTY_DIR}/nauty.o")
-#        set(NAUTY_LIBRARY "${NAUTY_DIR}/nauty.o")
-#    endif()
-#endif()
-#
-#if(NOT NAUTY_INCLUDE_DIR OR NOT NAUTY_LIBRARY)
-#    message(WARNING "Nauty not found. Isomorphism checking will be disabled.")
-#    message(STATUS "  Expected header: ${NAUTY_DIR}/nauty.h")
-#    message(STATUS "  Expected library: ${NAUTY_DIR}/nauty.a or ${NAUTY_DIR}/nauty.so")
-#else()
-#    message(STATUS "Nauty include dir: ${NAUTY_INCLUDE_DIR}")
-#    message(STATUS "Nauty library: ${NAUTY_LIBRARY}")
-#endif()
-
-# ======================
 # Define SOURCE files
 # ======================
 set(SOURCES
@@ -109,12 +74,6 @@ set(SOURCES
 add_executable(math_prog_extended ${SOURCES})
 
 
-# ===========================
-# Set up Boost
-# =====================
-find_package(Boost REQUIRED)
-target_include_directories(math_prog_extended PRIVATE ${Boost_INCLUDE_DIRS})
-
 # ======================
 # Include Directories
 # ======================
@@ -127,11 +86,6 @@ target_include_directories(math_prog_extended PRIVATE
         ${GMPXX_INCLUDE_DIRS}
 )
 
-## Add Nauty include if found
-#if(NAUTY_INCLUDE_DIR)
-#    target_include_directories(math_prog_extended PRIVATE ${NAUTY_INCLUDE_DIR})
-#    add_compile_definitions(HAVE_NAUTY)  # Define macro so code can check if nauty is available
-#endif()
 
 # ======================
 # Link Directories
@@ -150,11 +104,6 @@ target_link_libraries(math_prog_extended PRIVATE
         ${GUROBI_CXX_LIBRARY}
         ${GUROBI_LIBRARY}
 )
-
-## Add Nauty library if found
-#if(NAUTY_LIBRARY)
-#    target_link_libraries(math_prog_extended PRIVATE ${NAUTY_LIBRARY})
-#endif()
 
 # ======================
 # Set output name
