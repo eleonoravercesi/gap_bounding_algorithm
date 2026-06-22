@@ -3,6 +3,7 @@ using namespace std;
 #include <vector>
 #include "utils.h"
 #include "GB_algorithm.h"
+#include <chrono>
 
 std::vector<std::vector<int>> getComponents(
     const std::vector<std::vector<int>>& adj)
@@ -248,4 +249,74 @@ vector<Walk> extend_walk(int n, const Walk& w, Edge e) {
 
     return extended_walks;
 }
+
+// Generate all subsets of a given set with specific cardinality
+vector<vector<int>> get_subsets_by_cardinality(int n, int cardinality) {
+    vector<vector<int>> result;
+
+    vector<int> elements(n);
+
+    int i;
+    for (i = 0; i < n; ++i) {
+        elements[i] = i;
+    }
+
+    // Create a bitmask to track which elements are included
+    vector<int> selector(n, 0);
+
+    // Fill the first 'cardinality' positions with 1
+    fill(selector.begin(), selector.begin() + cardinality, 1);
+
+    do {
+        vector<int> subset;
+        for (int i = 0; i < n; ++i) {
+            if (selector[i]) {
+                subset.push_back(elements[i]);
+            }
+        }
+        result.push_back(subset);
+
+        // Generate the previous lexicographic permutation of the bitmask
+    } while (prev_permutation(selector.begin(), selector.end()));
+
+    return result;
+}
+
+void print_vector_of_vector_of_int(vector<vector<int>>& v) {
+    int n_vectors = v.size();
+    int i, j;
+    for (i = 0; i < n_vectors; ++i) {
+        vector<int> v_i = v[i];
+        for (j = 0; j < v_i.size(); ++j) {
+            cout << v_i[j] << " ";
+        }
+        cout << endl;
+    }
+}
+
+
+void print_progress_bar(int current, int total,
+                        chrono::time_point<chrono::high_resolution_clock> start, int bar_width) {
+    auto now = chrono::high_resolution_clock::now();
+    double elapsed = chrono::duration<double>(now - start).count();
+    double eta = (elapsed / current) * (total - current);
+
+    float progress = (float)current / total;
+    int filled = (int)(progress * bar_width);
+
+    cout << "\r[";
+    for (int i = 0; i < bar_width; ++i) {
+        if (i < filled)       cout << "=";
+        else if (i == filled) cout << ">";
+        else                  cout << " ";
+    }
+    cout << "] "
+         << (int)(progress * 100) << "% "
+         << current << "/" << total
+         << " ETA: " << (int)eta << "s    ";
+    cout.flush();
+
+    if (current == total) cout << "\n";
+}
+
 

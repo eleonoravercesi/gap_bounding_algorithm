@@ -7,9 +7,11 @@
 
 #include <vector>
 #include <utility>  // for std::pair
-
-using namespace std;
 #include <map>
+
+using std::vector;
+using std::pair;
+using std::map;
 
 // Structure to hold TSP solution results
 struct TSPSolution {

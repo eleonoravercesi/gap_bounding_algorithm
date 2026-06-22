@@ -4,165 +4,83 @@
  **/
 
 
+#include "nauty_wrapper.h"
 #include "ppl.hh"
-using namespace std;
 #include <vector>
 #include "readers.h"
 #include "GB_algorithm.h"
-#include "opt_plus.h"
 #include <format>
 #include <fstream>
 #include <chrono>
-#include "solvers.h"
+
 #include "utils.h"
+#include "graphs.h"
+
+// Move the `using namespace std;` below so that standard library
+// symbols are not injected into the global namespace before
+// including C headers like nauty.h (which declares an identifier
+// named `set`). This avoids the ambiguous reference between
+// `std::set` and nauty's `typedef setword set`.
+using namespace std;
+
 using std::chrono::duration;
+using namespace Parma_Polyhedra_Library;
 
-void opt_plut_test(string n) {
-    // TRUE
-    // string n;
-    // n = argv[1];
+// TODO for the GBE check old
 
-    // // DEBUG
-    // string n = "9";
+void get_ancestors(int k) {
+    int n;
 
-    string filename = format("/home/vercee/Documents/math_prog_extended/vertices/vertices{}.txt", n);
-    int n_int = stoi(n);
-    vector<vector<double>> x_list = read_vertices_chm(filename);
+    string filename_out = format("../ancestors/ancestors_new_{}.csv", k);
 
-    // Open a fine to write idx,opt_plus,gap_plus,runtime
-    ofstream fout;
-    fout.open(format("/home/vercee/Documents/math_prog_extended/output/results_gap_plus_{}.csv", n));
+    // Write an header on filename
+    ofstream myfile;
+    myfile.open (filename_out);
+    myfile << "n,xi\n";
+    myfile.close();
 
-    // Write the header
-    fout << "idx,opt_plus,gap_plus,runtime\n";
+    for (n = k + 3; n <= 2*k; n++) {
+    //for (n = 15; n <= 16; n++){
+        string filename = format("../graphs/{}_{}.txt", n, k);
+        vector<vector<int>> G_list = read_upper_triangle_graphs(filename);
+        int n_graphs = G_list.size();
+        //cout << "Ready to parse " << n_graphs << " graphs" << endl;
+        int g;
 
-    // Set a high precision so we can recover fractions
-    fout << setprecision(20);
+        auto start = chrono::high_resolution_clock::now();
+        for (g = 0; g < n_graphs; ++g) {
+            print_progress_bar(g, n_graphs, start);
+            auto t1 = std::chrono::high_resolution_clock::now();
+            vector<int> current_graph = G_list[g];
+            vector<VertexFraction> vertices_for_this_g =  get_all_vertices_with_graph_constraints(n, k, current_graph, false);
 
-    // For loop on the vectors
-    vector<double> gaps;
-    for (size_t i = 0; i < x_list.size(); ++i) {
-        vector<double> x_0 = x_list[i];
+            int n_vertices_for_this_g = vertices_for_this_g.size();
+            //cout << "\t Vertices originated from this graph: " << n_vertices_for_this_g << endl;
+            if (n_vertices_for_this_g > 0) {
+                vector<int> unique_idx = filter_isomorphic_graphs(vertices_for_this_g, n,  0);
 
-        // Start opt solution
-        auto t1 = std::chrono::high_resolution_clock::now();
-        double opt_plus_val = opt_plus(x_0, n_int, 0);
-        auto t2 = std::chrono::high_resolution_clock::now();
+                // // Dummy placeholder
+                // vector<int> unique_idx;
+                // for (int u = 0; u < n_vertices_for_this_g; ++u) {
+                //     unique_idx.push_back(u);
+                // }
 
-        /* Getting number of milliseconds as a double. */
-        duration<double, std::milli> ms_double = t2 - t1;
+                //cout << "\t\t After filtering... " << unique_idx.size() << endl;
+                // Open file in append mode (creates if doesn't exist, appends if exists)
+                ofstream outfile(filename_out, ios::app);
 
-        gaps.push_back(opt_plus_val);
-        cout << "\t \t \t Gap for vertex " << i << ": " << 1 / opt_plus_val << endl;
-        cout << "-----------------------------------" << endl;
-
-        // Now, write on file
-        fout << i << "," << opt_plus_val << "," << 1 / opt_plus_val << "," << ms_double << "\n";
-    }
-    fout.close();
-}
-
-void opt_II_test(string n) {
-    // TRUE
-    // string n;
-    // n = argv[1];
-
-    // // DEBUG
-    // string n = "9";
-
-    string filename = format("/home/vercee/Documents/math_prog_extended/vertices/vertices{}.txt", n);
-    int n_int = stoi(n);
-    vector<vector<double>> x_list = read_vertices_chm(filename);
-
-    // Open a fine to write idx,opt_plus,gap_plus,runtime
-    ofstream fout;
-    fout.open(format("/home/vercee/Documents/math_prog_extended/output/results_opt_II_{}.csv", n));
-
-    // Write the header
-    fout << "idx,opt_plus,gap_plus,runtime\n";
-
-    // Set a high precision so we can recover fractions
-    fout << setprecision(20);
-
-    // For loop on the vectors
-    vector<double> gaps;
-    int t, i, j, e;
-    for (t = 0; t < x_list.size(); ++t) {
-        vector<double> x_0 = x_list[t];
-
-        map<pair<int,int>, double> x_0_dict;
-
-        for (i = 0; i < n_int; ++i) {
-            for (j = i + 1; j < n_int; ++j) {
-                e = from_i_j_to_e(i, j, n_int);
-                if (x_0[e] > 0) {
-                    x_0_dict[make_pair(i,j)] = x_0[e]; // [ ] for insertion, .at for access
+                if (!outfile.is_open()) {
+                    cerr << "Error: Cannot open or create file " << filename << "\n";
+                    exit(1);
                 }
+
+                for (int u = 0; u < unique_idx.size();  ++u) {
+                    outfile << vertices_for_this_g[unique_idx[u]].toString(n);
+                }
+                outfile.close();
             }
-        }
-
-
-
-        auto t1 = std::chrono::high_resolution_clock::now();
-        OptIISolution result;
-        vector<Walk> w_start; // empty
-        result = solve_optII(n_int, x_0_dict, w_start, 1e-6, 0);
-        auto t2 = std::chrono::high_resolution_clock::now();
-
-        /* Getting number of milliseconds as a double. */
-        duration<double, std::milli> ms_double = t2 - t1;
-
-        double opt_II_val = result.opt_value;
-        cout << "\t \t \t Gap for vertex " << t << ": " << 1 / opt_II_val << endl;
-        cout << "-----------------------------------" << endl;
-
-        // Now, write on file
-        fout << t << "," << opt_II_val << "," << 1 / opt_II_val << "," << ms_double << "\n";
-    }
-    fout.close();
-}
-
-void graph_tsp_test() {
-    std::map<std::pair<int, int>, double> edges;
-    edges[{0, 1}] = 1.0; edges[{1, 2}] = 1.0; edges[{2, 3}] = 1.0;
-    edges[{3, 4}] = 1.0; edges[{4, 5}] = 1.0;
-
-    // Middle Row (6-11)
-    edges[{6, 7}] = 1.0; edges[{7, 8}] = 1.0; edges[{8, 9}] = 1.0;
-    edges[{9, 10}] = 1.0; edges[{10, 11}] = 1.0;
-
-    // Bottom Row (12-17)
-    edges[{12, 13}] = 1.0; edges[{13, 14}] = 1.0; edges[{14, 15}] = 1.0;
-    edges[{15, 16}] = 1.0; edges[{16, 17}] = 1.0;
-
-    // Vertical/Connecting Edges (Weight 2)
-    edges[{0, 6}] = 2.0; edges[{6, 12}] = 2.0; // Left side
-    edges[{5, 11}] = 2.0; edges[{11, 17}] = 2.0; // Right side
-
-    GraphTSPSolution result;
-    result = solve_graph_tsp(18, edges, 2);
-
-}
-
-void test_BB_move() {
-    int n = 4;
-
-    Vertex x0; // This is not a vertex but I do not care at this stage
-    x0[{0, 1}] = 1.0;
-    x0[{0, 2}] = 0.5;
-    x0[{0, 3}] = 1.0;
-    x0[{1, 2}] = 0.5;
-    x0[{1, 3}] = 0.0;
-    x0[{2, 3}] = 0.0;
-
-    Edge e = {0, 1};
-    Vertex x1 = bbmove(n, x0, e);
-
-    // Print x1
-    int i, j;
-    for (i = 0; i < n + 1; ++i) {
-        for (j = i + 1; j < n + 1 ; ++j) {
-            cout << i << " , " << j << " --> " << x1[{i, j}] << endl;
+            auto t2 = std::chrono::high_resolution_clock::now();
+            //cout << "\t" << g + 1 << "/" << n_graphs << " done in " << (t2 - t1) * 1e-9 << " seconds." << endl;
         }
     }
 }
@@ -170,8 +88,8 @@ void test_BB_move() {
 void gb_test(string k) {
     // Here, k is from 3 onward!!
 
-    string filename = format("/home/vercee/Documents/math_prog_extended/ancestors/ancestors_{}.csv", k);
-    vector<pair<int, vector<double> > > x_list;
+    string filename = format("/home/vercee/Documents/math_prog_extended/ancestors/ancestors_new_{}.csv", k);
+    vector<VertexFraction> x_list;
     x_list = read_ancestors(filename);
 
     // Open a fine to write idx,opt_plus,gap_plus,runtime
@@ -186,9 +104,17 @@ void gb_test(string k) {
 
     // For loop on the vectors
     int t, i, j, e;
+    auto start = chrono::high_resolution_clock::now();
     for (t = 0; t < x_list.size(); ++t) {
-        vector<double> x_0 = x_list[t].second;
-        int n_int = x_list[t].first;
+        print_progress_bar(t, x_list.size(), start);
+        int n_int = x_list[t].getn();
+        int m = x_list[t].v.size();
+        double den = x_list[t].den;
+        vector<double> x_0(m);
+
+        for (int e = 0; e < m; ++e) {
+         x_0[e] = (double)x_list[t].v[e] / den;
+        }
 
         map<pair<int,int>, double> x_0_dict;
 
@@ -215,7 +141,7 @@ void gb_test(string k) {
 
         double gap_II_val = result.gapII;
         double family_gap = result.family_gapII;
-        cout << "Done with " << t << " out of " << x_list.size() << " with family gap " << family_gap << endl;
+        //cout << "Done with " << t << " out of " << x_list.size() << " with family gap " << family_gap << endl;
 
         int iterations = result.iterations;
 
@@ -227,5 +153,13 @@ void gb_test(string k) {
 
 
 int main(int argc, char *argv[]) {
-    gb_test("7");
+    int k = 8;
+    cout << "✨ Ready for k = " << k << endl;
+    string k_str = itos(k);
+    cout << "✨ COMPUTING ANCESTORS ✨" << endl;
+    get_ancestors(k);
+    cout << endl << "✨ RUN GB ✨" << endl;
+    gb_test(k_str);
 }
+
+
