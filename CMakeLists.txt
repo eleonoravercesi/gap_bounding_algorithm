@@ -3,60 +3,94 @@ project(math_prog_extended)
 
 set(CMAKE_CXX_STANDARD 20)
 
-# For Boost
-cmake_policy(SET CMP0167 NEW)
+## For Boost
+#cmake_policy(SET CMP0167 NEW)
 
-# ======================
-# Setup Gurobi - IMPROVED
-# ======================
-# Check if GUROBI_HOME is set
+
+# ==================================================
+# Setup Gurobi
+# ==================================================
+message(STATUS "Gurobi Setup:")
+
 if(NOT DEFINED ENV{GUROBI_HOME})
-    message(FATAL_ERROR "GUROBI_HOME environment variable is not set. Please set it to your Gurobi installation directory.")
+    message(FATAL_ERROR
+            "GUROBI_HOME environment variable is not set.\n"
+            "Please set it to your Gurobi installation directory.\n")
 endif()
 
-# TODO should work, but as I am DEVASTATED, I set in manually
-# set(GUROBI_DIR $ENV{GUROBI_HOME})
-set(GUROBI_DIR "/opt/gurobi1302/linux64")
-message(STATUS "GUROBI_HOME is set to: ${GUROBI_DIR}")
+find_path(GUROBI_INCLUDE_DIR
+        NAMES gurobi_c++.h
+        PATHS "$ENV{GUROBI_HOME}/include"
+        REQUIRED
+)
+message(STATUS "    include dir: ${GUROBI_INCLUDE_DIR}")
 
-# Verify that the include directory exists
-if(NOT EXISTS "${GUROBI_DIR}/include/gurobi_c.h")
-    message(FATAL_ERROR "Cannot find gurobi_c.h in ${GUROBI_DIR}/include. Please check your GUROBI_HOME setting.")
-endif()
+find_library(GUROBI_LIBRARY
+        NAMES gurobi130 gurobi120 gurobi110 gurobi100
+        PATHS "$ENV{GUROBI_HOME}/lib"
+        REQUIRED
+)
+message(STATUS "    library: ${GUROBI_LIBRARY}")
 
-# Determine the Gurobi library name based on version
-# For Gurobi 13.0, the library is gurobi130/home/vercee/Documents
-# Adjust this based on your actual Gurobi version
-set(GUROBI_CXX_LIBRARY "gurobi_c++")
-set(GUROBI_LIBRARY "gurobi130")
+find_library(GUROBI_CXX_LIBRARY
+        NAMES gurobi_c++
+        PATHS "$ENV{GUROBI_HOME}/lib"
+        REQUIRED
+)
+message(STATUS "    c++ library: ${GUROBI_CXX_LIBRARY}")
 
-# ======================
-# Setup GMP and GMPXX (using pkg-config)
-# ======================
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(GMP REQUIRED gmp)
-pkg_check_modules(GMPXX REQUIRED gmpxx)
 
-message(STATUS "GMP found: ${GMP_LIBRARIES}")
-message(STATUS "GMPXX found: ${GMPXX_LIBRARIES}")
+# ==================================================
+# Setup GMP
+# ==================================================
+message(STATUS "GMP Setup:")
 
-# ======================
+find_path(GMP_INCLUDE_DIR
+        NAMES gmp.h
+        REQUIRED
+)
+message(STATUS "    include dir: ${GMP_INCLUDE_DIR}")
+
+find_library(GMP_LIBRARY
+        NAMES gmp
+        REQUIRED
+)
+message(STATUS "    library: ${GMP_LIBRARY}")
+
+find_path(GMPXX_INCLUDE_DIR
+        NAMES gmpxx.h
+        REQUIRED
+)
+message(STATUS "    c++ include dir: ${GMPXX_INCLUDE_DIR}")
+
+find_library(GMPXX_LIBRARY
+        NAMES gmpxx
+        REQUIRED
+)
+message(STATUS "    c++ library: ${GMPXX_LIBRARY}")
+
+
+# ==================================================
 # Setup PPL
-# ======================
-find_path(PPL_INCLUDE_DIR ppl.hh)
-find_library(PPL_LIBRARY NAMES ppl)
+# ==================================================
+message(STATUS "PPL Setup:")
 
-if(NOT PPL_LIBRARY)
-    message(FATAL_ERROR "PPL library not found. Install libppl-dev.")
-endif()
+find_path(PPL_INCLUDE_DIR
+        NAMES ppl.hh
+        REQUIRED
+)
+message(STATUS "    include dir: ${PPL_INCLUDE_DIR}")
 
-message(STATUS "PPL library found: ${PPL_LIBRARY}")
-message(STATUS "PPL include dir: ${PPL_INCLUDE_DIR}")
+find_library(PPL_LIBRARY
+        NAMES ppl
+        REQUIRED
+)
+message(STATUS "    library: ${PPL_LIBRARY}")
 
 
-# ======================
+# ==================================================
 # Define SOURCE files
-# ======================
+# ==================================================
 set(SOURCES
         main.cpp
         src/readers.cpp
@@ -68,44 +102,38 @@ set(SOURCES
         src/graphs.cpp
 )
 
-# ======================
+
+# ==================================================
 # Create executable
-# ======================
+# ==================================================
 add_executable(math_prog_extended ${SOURCES})
 
 
-# ======================
+# ==================================================
 # Include Directories
-# ======================
+# ==================================================
 target_include_directories(math_prog_extended PRIVATE
         include
-        ${GUROBI_DIR}/include     # Gurobi headers
-        ${PPL_INCLUDE_DIR}
         /usr/include/
-        ${GMP_INCLUDE_DIRS}
-        ${GMPXX_INCLUDE_DIRS}
+        ${GUROBI_INCLUDE_DIR}
+        ${PPL_INCLUDE_DIR}
+        ${GMP_INCLUDE_DIR}
+        ${GMPXX_INCLUDE_DIR}
 )
 
 
-# ======================
-# Link Directories
-# ======================
-target_link_directories(math_prog_extended PRIVATE
-        ${GUROBI_DIR}/lib
-)
-
-# ======================
+# ==================================================
 # Link Libraries (ORDER MATTERS!)
-# ======================
+# ==================================================
 target_link_libraries(math_prog_extended PRIVATE
-        ${GMP_LIBRARIES}
-        ${GMPXX_LIBRARIES}
         ${PPL_LIBRARY}
+        ${GMPXX_LIBRARY}
+        ${GMP_LIBRARY}
         ${GUROBI_CXX_LIBRARY}
         ${GUROBI_LIBRARY}
 )
 
-# ======================
+# ==================================================
 # Set output name
-# ======================
+# ==================================================
 set_target_properties(math_prog_extended PROPERTIES OUTPUT_NAME "solver")
