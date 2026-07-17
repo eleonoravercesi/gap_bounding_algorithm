@@ -19,10 +19,11 @@ bool are_isomorphic_vertices(VertexFraction v1, VertexFraction v2, int n, int ve
         }
         return false;
     }
-    if (v1.toCounter() != v2.toCounter()) if (verbose == 1) {
-        cout << "Non isomorphic bc of different values" << endl;
+    if (v1.toCounter() != v2.toCounter()) {
+        if (verbose == 1) {
+            cout << "Non isomorphic bc of different values" << endl;
+        }
         return false;
-
     }
 
     std::vector<std::vector<int>> V1 = v1.toMatrix(n);

@@ -12,9 +12,11 @@
 #include <format>
 #include <fstream>
 #include <chrono>
+#include <ranges>
 
 #include "utils.h"
 #include "graphs.h"
+#include "opt_hat.h"
 
 // Move the `using namespace std;` below so that standard library
 // symbols are not injected into the global namespace before
@@ -29,28 +31,24 @@ using namespace Parma_Polyhedra_Library;
 // TODO for the GBE check old
 
 void get_ancestors(int k) {
-    int n;
-
     string filename_out = format("../ancestors/ancestors_new_{}.csv", k);
 
-    // Write an header on filename
+    // Write a header on filename
     ofstream myfile;
     myfile.open (filename_out);
     myfile << "n,xi\n";
     myfile.close();
 
-    for (n = k + 3; n <= 2*k; n++) {
-    //for (n = 15; n <= 16; n++){
+    for (int n = k + 3; n <= 2*k; ++n) {
         string filename = format("../graphs/{}_{}.txt", n, k);
         vector<vector<int>> G_list = read_upper_triangle_graphs(filename);
         int n_graphs = G_list.size();
         //cout << "Ready to parse " << n_graphs << " graphs" << endl;
-        int g;
 
         auto start = chrono::high_resolution_clock::now();
-        for (g = 0; g < n_graphs; ++g) {
+        for (int g = 0; g < n_graphs; ++g) {
             print_progress_bar(g, n_graphs, start);
-            auto t1 = std::chrono::high_resolution_clock::now();
+            // auto t1 = std::chrono::high_resolution_clock::now();
             vector<int> current_graph = G_list[g];
             vector<VertexFraction> vertices_for_this_g =  get_all_vertices_with_graph_constraints(n, k, current_graph, false);
 
@@ -154,13 +152,24 @@ void gb_test(string k) {
 
 
 int main(int argc, char *argv[]) {
-    int k = 8;
-    cout << "✨ Ready for k = " << k << endl;
-    string k_str = itos(k);
+    // int k = 8;
+    // cout << "✨ Ready for k = " << k << endl;
+    // string k_str = itos(k);
     // cout << "✨ COMPUTING ANCESTORS ✨" << endl;
     // get_ancestors(k);
-    cout << endl << "✨ RUN GB ✨" << endl;
-    gb_test(k_str);
+    // cout << endl << "✨ RUN GB ✨" << endl;
+    // gb_test(k_str);
+
+
+    Vertex x = tetrahedron_instance();
+    GTSPSolution sol = solve_gtsp(x);
+
+    cout << sol.opt_value << endl;
+    for (Edge e : sol.opt_walk | std::views::keys) {
+        cout << "(" << e.first + 1 << ", " << e.second + 1 << "): " << sol.opt_walk.at(e) << endl;
+    }
+
+    return 0;
 }
 
 

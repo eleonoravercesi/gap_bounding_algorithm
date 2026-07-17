@@ -100,6 +100,8 @@ set(SOURCES
         src/GB_algorithm.cpp
         src/vertices_generator.cpp
         src/graphs.cpp
+        src/opt_hat.cpp
+        src/graph_utils.cpp
 )
 
 

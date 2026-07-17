@@ -183,6 +183,7 @@ struct VertexFraction {
             if (num > 0 && num % den != 0){ // It means that you cannot simplify num and den, so is minimal!
                 return true;
             }
+            // TODO: Aggiusta: il metodo e' sbagliato, l'unico vettore non "minimal" qui e' il vettore di zeri.
         }
         // Only return false if we checked the WHOLE loop and never hit the 'true' condition
         return false;

@@ -13,4 +13,4 @@ vector<VertexFraction> read_ancestors(const string& filename);
 
 vector<vector<int>> read_upper_triangle_graphs(const string& filename);
 
-#endif
+#endif // READERS_H
