@@ -9,12 +9,12 @@ using std::map, std::pair, std::vector;
 
 
 class ConnectivityCutCallback : public GRBCallback {
-    map<pair<int, int>, GRBVar>* w_vars;
-    int n;
+    const int n;
+    const map<pair<int, int>, GRBVar>& w_vars;
 
 public:
-    ConnectivityCutCallback(map<pair<int, int>, GRBVar>* w_vars_ptr, int n)
-        : w_vars(w_vars_ptr), n(n) {}
+    ConnectivityCutCallback(int n, const map<pair<int, int>, GRBVar>& w_vars)
+        : n(n), w_vars(w_vars) {}
 
 protected:
     void callback() override {
@@ -22,30 +22,38 @@ protected:
             if (where != GRB_CB_MIPSOL)
                 return;
 
-            vector<Edge> edges;
-            for (const auto& edge : *w_vars | std::views::keys)
-                edges.push_back(edge);
+            vector<Edge> edges, support_edges;
+            map<int, vector<Edge>> adj;
+            for (auto& e : w_vars | std::views::keys) {
+                edges.push_back(e);
+                if (getSolution(w_vars.at(e)) > 0.5)
+                    support_edges.push_back(e);
+                adj[e.first].push_back(e);
+                adj[e.second].push_back(e);
+            }
 
-            vector<vector<int>> components = connected_components(n, edges);
+            vector<vector<int>> components = connected_components(n, support_edges);
             if (components.size() > 1) {
-                for (const auto& comp : components) {
+                vector<char> in_comp(n, 0);
+                for (auto& comp : components) {
+                    for (int node : comp)
+                        in_comp[node] = 1;
+
                     GRBLinExpr cut_expr = 0;
-                    for (const auto& [edge, w_var] : *w_vars) {
-                        auto& [i, j] = edge;
-                        int count = 0;
-                        for (const auto& node : comp) {
-                            if (i == node || j == node)
-                                if (++count == 2)
-                                    break;
-                        }
-                        if (count == 1)
-                            cut_expr += w_var;
-                    }
+                    for (int node : comp)
+                        for (auto& e : adj[node])
+                            if (!in_comp[e.first] || !in_comp[e.second])
+                                cut_expr += w_vars.at(e);
+
                     addLazy(cut_expr >= 2.0);
+
+                    for (int node : comp)
+                        in_comp[node] = 0;
                 }
             }
 
-        } catch (GRBException& e) {
+        }
+        catch (GRBException& e) {
             std::cerr << "Callback error: " << e.getMessage() << std::endl;
         }
     }
@@ -54,11 +62,11 @@ protected:
 
 GTSPSolution solve_gtsp(const Cost& c) {
     vector<Edge> edges;
-    for (const auto& e : c | std::views::keys)
+    for (auto& e : c | std::views::keys)
         edges.push_back(e);
 
     int n = 0;
-    for (const auto& [i, j] : edges)
+    for (auto& [i, j] : edges)
         n = std::max(n, std::max(i, j));
     ++n;
 
@@ -86,14 +94,14 @@ GTSPSolution solve_gtsp(const Cost& c) {
 
         // Objective
         GRBLinExpr obj = 0;
-        for (const auto& [e, w_var] : w_vars)
+        for (auto& [e, w_var] : w_vars)
             obj += c.at(e) * w_var;
         model.setObjective(obj, GRB_MINIMIZE);
 
         // Constraints
         for (int i = 0; i < n; ++i) {
             GRBLinExpr expr = 0;
-            for (const auto& [e, w_var] : w_vars) {
+            for (auto& [e, w_var] : w_vars) {
                 if (e.first == i || e.second == i)
                     expr += w_var;
             }
@@ -101,13 +109,13 @@ GTSPSolution solve_gtsp(const Cost& c) {
         }
 
         // Callback
-        ConnectivityCutCallback callback(&w_vars, n);
+        ConnectivityCutCallback callback(n, w_vars);
         model.setCallback(&callback);
 
         model.optimize();
 
         map<Edge, int> opt_walk;
-        for (const auto& [e, w_var] : w_vars) {
+        for (auto& [e, w_var] : w_vars) {
             double val = w_var.get(GRB_DoubleAttr_X);
             opt_walk[e] = val < 0.5 ? 0 : val < 1.5 ? 1 : 2;
         }
@@ -116,7 +124,7 @@ GTSPSolution solve_gtsp(const Cost& c) {
     }
     catch (const GRBException& e) {
         std::cerr << "Gurobi Error: " << e.getMessage() << std::endl;
-        exit(1);
+        throw;
     }
 }
 
@@ -130,7 +138,7 @@ OptHatSolution solve_opt_hat(const Vertex& x) {
     model.set(GRB_IntParam_OutputFlag, 0);
     model.set(GRB_IntAttr_ModelSense, 1);  // minimization
 
-    for (const auto& [edge, value] : x)
+    for (auto& [edge, value] : x)
         if (value > 0)
             model.addVar(0.0, 1.0, value, GRB_CONTINUOUS,
                 "c_" + std::to_string(edge.first) + "_" + std::to_string(edge.second));
@@ -146,7 +154,7 @@ OptHatSolution solve_opt_hat(const Vertex& x) {
     //     ...
     // } catch (const GRBException& e) {
     //     std::cerr << "Gurobi Error: " << e.getMessage() << std::endl;
-    //     exit(1);
+    //     throw;
     // }
 
     return {};

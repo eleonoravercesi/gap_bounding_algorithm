@@ -39,7 +39,3 @@
 
 # Debug information files
 *.dwo
-
-
-# IDEA Settings
-.idea/
