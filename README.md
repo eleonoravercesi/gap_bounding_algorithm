@@ -50,6 +50,7 @@ sudo mv gurobi1302 /opt/gurobi1302
 
 **Note:** For ARM Linux, use `gurobi13.0.2_armlinux64.tar.gz` instead.
 
+
 ### 2. Set Up Environment Variables
 
 Add the following lines to your `.bashrc` file (for bash shell) or `.zshrc` file (for zsh shell):
@@ -85,6 +86,7 @@ Since you're at an academic institution (USI), you can get a free academic licen
 
 **Important:** You must be connected to your academic network (USI network) when running `grbgetkey`.
 
+
 ### 4. Test the Installation
 
 Verify that Gurobi is correctly installed:
@@ -96,8 +98,64 @@ which gurobi_cl
 gurobi_cl
 ```
 
-### Troubleshooting
-TODO
+## Troubleshooting
+
+### Issues with Gurobi Installation on WSL2
+
+If you are working on WSL2, you likely encounter issues with Gurobi license.
+The (Named-User) Academic Licenses are tied to an HostID which depends on the MAC address of the machine,
+and WSL2 changes the MAC address on each restart, causing the error
+`HostID mismatch (licensed to xxxxxxxx, HostID is yyyyyyyy)`.
+
+To solve this issue, you need to set a persistent MAC address for WSL2 and make Gurobi reference it.
+
+1. **Modify `/etc/wsl.conf`** to run the script as the root user at WSL startup, adding the following lines.
+   ```ini
+   [boot]
+   command = "/usr/local/bin/persistent-mac-eth1.sh"
+   ```
+
+2. **Create the script** `/usr/local/bin/persistent-mac-eth1.sh` with the following content.
+   ```bash
+   #!/bin/bash
+   
+   # Assign a persistent MAC address for adapter eth1
+   mac="1a:2b:3c:4d:5e:6f"
+   if ! ip link show | grep -q "$mac"; then
+      if ! ip link show eth1 &> /dev/null; then
+         if ! ip link show bond0 &> /dev/null; then
+            sudo ip link add bond0 type bond
+         fi
+         sudo ip link set dev bond0 down
+         sudo ip link set dev bond0 name eth1
+      fi
+      sudo ip link set dev eth1 down
+      sudo ip link set dev eth1 address "$mac"
+      sudo ip link set dev eth1 up
+   fi
+   ```
+   Make the script executable.
+   ```bash
+   sudo chmod +x /usr/local/bin/persistent-mac-eth1.sh
+   ```
+   
+3. **Restart WSL** to apply the changes, and check that the MAC address is persistent.
+   ```bash
+   ip link show eth1
+   ```
+
+4. **Save the `eth1` adapter information** needed by Gurobi into a file.
+   ```bash
+   grbprobe --adapter eth1 --output grbprobe.info
+   ```
+
+5. **Get a new Academic License and link it with the `--input` flag**
+   to the persistent MAC address `eth1`.
+   ```bash
+   grbgetkey xxxxxx-xxxx-xxxx-xxxx-xxxxxxxx --input grbprobe.info
+   ```
+
+
 
 ## TODO List
 - [ ] Enhance it with LKH3
