@@ -7,6 +7,8 @@
 
 using std::map, std::pair, std::vector;
 
+constexpr double TOLERANCE = 1e-6;
+
 
 class ConnectivityCutCallback : public GRBCallback {
     const int n;
@@ -60,9 +62,9 @@ protected:
 };
 
 
-GTSPSolution solve_gtsp(const Cost& c) {
+GTSPSolution solve_gtsp(const Cost& c, const vector<Edge>& forced_edges = {}) {
     vector<Edge> edges;
-    for (auto& e : c | std::views::keys)
+    for (const Edge& e : c | std::views::keys)
         edges.push_back(e);
 
     int n = 0;
@@ -70,94 +72,121 @@ GTSPSolution solve_gtsp(const Cost& c) {
         n = std::max(n, std::max(i, j));
     ++n;
 
-    try {
-        GRBEnv env = GRBEnv(true);
-        env.set(GRB_IntParam_OutputFlag, 0);
-        env.start();
-
-        GRBModel model = GRBModel(env);
-        model.set(GRB_IntParam_OutputFlag, 0);
-        model.set(GRB_IntParam_LazyConstraints, 1);
-
-        // Variables
-        map<pair<int, int>, GRBVar> w_vars;
-        for (Edge e : edges)
-            w_vars[e] = model.addVar(0.0, 2.0, 0.0, GRB_INTEGER,
-                "w_" + std::to_string(e.first) + "_" + std::to_string(e.second));
-
-        vector<GRBVar> d_vars(n);
-        for (int i = 0; i < n; ++i)
-            d_vars[i] = model.addVar(1.0, 2 * (n - 1), 0.0, GRB_INTEGER,
-                "d_" + std::to_string(i));
-
-        model.update();
-
-        // Objective
-        GRBLinExpr obj = 0;
-        for (auto& [e, w_var] : w_vars)
-            obj += c.at(e) * w_var;
-        model.setObjective(obj, GRB_MINIMIZE);
-
-        // Constraints
-        for (int i = 0; i < n; ++i) {
-            GRBLinExpr expr = 0;
-            for (auto& [e, w_var] : w_vars) {
-                if (e.first == i || e.second == i)
-                    expr += w_var;
-            }
-            model.addConstr(expr >= 2.0 * d_vars[i], "degree_" + std::to_string(i));
-        }
-
-        // Callback
-        ConnectivityCutCallback callback(n, w_vars);
-        model.setCallback(&callback);
-
-        model.optimize();
-
-        map<Edge, int> opt_walk;
-        for (auto& [e, w_var] : w_vars) {
-            double val = w_var.get(GRB_DoubleAttr_X);
-            opt_walk[e] = val < 0.5 ? 0 : val < 1.5 ? 1 : 2;
-        }
-
-        return {model.get(GRB_DoubleAttr_ObjVal), opt_walk, model.get(GRB_DoubleAttr_Runtime)};
-    }
-    catch (const GRBException& e) {
-        std::cerr << "Gurobi Error: " << e.getMessage() << std::endl;
-        throw;
-    }
-}
-
-
-OptHatSolution solve_opt_hat(const Vertex& x) {
     GRBEnv env = GRBEnv(true);
     env.set(GRB_IntParam_OutputFlag, 0);
     env.start();
 
     GRBModel model = GRBModel(env);
     model.set(GRB_IntParam_OutputFlag, 0);
-    model.set(GRB_IntAttr_ModelSense, 1);  // minimization
+    model.set(GRB_IntParam_LazyConstraints, 1);
 
-    for (auto& [edge, value] : x)
-        if (value > 0)
-            model.addVar(0.0, 1.0, value, GRB_CONTINUOUS,
-                "c_" + std::to_string(edge.first) + "_" + std::to_string(edge.second));
+    // Variables
+    map<pair<int, int>, GRBVar> w_vars;
+    for (Edge& e : edges)
+        w_vars[e] = model.addVar(0.0, 2.0, 0.0, GRB_INTEGER,
+            std::format("w_{}_{}", e.first, e.second));
+    for (const Edge& e : forced_edges)
+        w_vars[e].set(GRB_DoubleAttr_LB, 1.0);
 
-    // model.addConstr(??? >= 1.0);
+    vector<GRBVar> d_vars(n);
+    for (int i = 0; i < n; ++i)
+        d_vars[i] = model.addVar(1.0, n - 1, 0.0, GRB_INTEGER,
+            std::format("d_{}", i));
 
+    model.update();
 
+    // Objective
+    GRBLinExpr obj = 0;
+    for (auto& [e, w_var] : w_vars)
+        obj += c.at(e) * w_var;
+    model.setObjective(obj, GRB_MINIMIZE);
+
+    // Constraints
+    GRBLinExpr degree_expr;
+    for (int i = 0; i < n; ++i) {
+        degree_expr = 0;
+        for (auto& [e, w_var] : w_vars)
+            if (e.first == i || e.second == i)
+                degree_expr += w_var;
+        model.addConstr(degree_expr == 2.0 * d_vars[i],
+            std::format("degree_{}", i));
+    }
+
+    // Callback
+    ConnectivityCutCallback callback(n, w_vars);
+    model.setCallback(&callback);
+
+    // Optimize
     model.optimize();
 
+    map<Edge, int> opt_walk;
+    for (auto& [e, w_var] : w_vars) {
+        double val = w_var.get(GRB_DoubleAttr_X);
+        opt_walk[e] = val < 0.5 ? 0 : val < 1.5 ? 1 : 2;
+    }
+
+    return {model.get(GRB_DoubleAttr_ObjVal), opt_walk, model.get(GRB_DoubleAttr_Runtime)};
+}
 
 
-    // try {
-    //     ...
-    // } catch (const GRBException& e) {
-    //     std::cerr << "Gurobi Error: " << e.getMessage() << std::endl;
-    //     throw;
-    // }
+OptHatSolution solve_opt_hat(const Vertex& x) {
+    vector<Edge> edges, one_edges;
+    for (const Edge& e : x | std::views::keys) {
+        if (x.at(e) > 0.0)
+            edges.push_back(e);
+        if (x.at(e) > 1.0 - TOLERANCE)
+            one_edges.push_back(e);
+    }
 
-    return {};
+    int n = 0;
+    for (auto& [i, j] : edges)
+        n = std::max(n, std::max(i, j));
+    ++n;
+
+    GRBEnv env = GRBEnv(true);
+    env.set(GRB_IntParam_OutputFlag, 0);
+    env.start();
+
+    GRBModel model = GRBModel(env);
+    model.set(GRB_IntParam_OutputFlag, 0);
+
+    // Variables
+    map<pair<int, int>, GRBVar> c_vars;
+    for (Edge& e : edges)
+        if (x.at(e) > 0.0)
+            c_vars[e] = model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
+                std::format("x_{}_{}", e.first, e.second));
+
+    model.update();
+
+    // Objective
+    GRBLinExpr obj = 0;
+    for (auto& [e, c_var] : c_vars)
+        obj += x.at(e) * c_var;
+    model.setObjective(obj, GRB_MINIMIZE);
+
+    // Optimize
+    Walk dummy_walk = {};
+    for (Edge& e : edges)
+        dummy_walk[e] = 2;
+    GTSPSolution gtsp_sol = {0.0, dummy_walk, 0.0};
+
+    Cost opt_cost;
+    while (gtsp_sol.opt_value < 1.0 - TOLERANCE) {
+        GRBLinExpr walk_expr = 0;
+        for (auto& [e, c_var] : c_vars)
+            walk_expr += gtsp_sol.opt_walk.at(e) * c_var;
+        model.addConstr(walk_expr >= 1.0);
+
+        model.optimize();
+
+        for (auto& [e, c_var] : c_vars)
+            opt_cost[e] = c_var.get(GRB_DoubleAttr_X);
+
+        gtsp_sol = solve_gtsp(opt_cost, one_edges);
+    }
+
+    return {model.get(GRB_DoubleAttr_ObjVal), opt_cost, gtsp_sol.opt_walk, model.get(GRB_DoubleAttr_Runtime)};
 }
 
 
@@ -180,7 +209,7 @@ Vertex tetrahedron_instance() {
     for (int i = 0; i < 12; i++)
         for (int j = i + 1; j < 12; j++)
             if (x_mat[i][j] > 0)
-                x[make_pair(i, j)] = x_mat[i][j];
+                x[{i, j}] = x_mat[i][j];
 
     return x;
 }

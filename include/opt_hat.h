@@ -12,12 +12,12 @@ struct GTSPSolution {
 
 struct OptHatSolution {
     double opt_value;
-    Vertex opt_cost;
+    Cost opt_cost;
     Walk opt_walk;
     double solve_time;
 };
 
-GTSPSolution solve_gtsp(const Cost& c);
+GTSPSolution solve_gtsp(const Cost& c, const vector<Edge>& forced_edges);
 
 OptHatSolution solve_opt_hat(const Vertex& x);
 

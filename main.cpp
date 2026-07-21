@@ -162,12 +162,19 @@ int main(int argc, char *argv[]) {
 
 
     Vertex x = tetrahedron_instance();
-    GTSPSolution sol = solve_gtsp(x);
+    OptHatSolution sol = solve_opt_hat(x);
 
-    cout << sol.opt_value << endl;
-    for (Edge e : sol.opt_walk | std::views::keys) {
-        cout << "(" << e.first + 1 << ", " << e.second + 1 << "): " << sol.opt_walk.at(e) << endl;
-    }
+    cout << "Gap^ = " << 1 / sol.opt_value << endl;
+
+    cout << endl;
+    cout << "Optimal cost:" << endl;
+    for (auto& [e, value] : sol.opt_cost)
+        cout << "(" << e.first + 1 << ", " << e.second + 1 << "): " << value << endl;
+
+    cout << endl;
+    cout << "Optimal walk:" << endl;
+    for (auto& [e, value] : sol.opt_walk)
+        cout << "(" << e.first + 1 << ", " << e.second + 1 << "): " << value << endl;
 
     return 0;
 }

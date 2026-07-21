@@ -25,7 +25,7 @@ vector<pair<int,int>> delta(
 using Vertex = map<pair<int, int>, double>;
 using Cost = map<pair<int, int>, double>;
 using Edge = pair<int, int>;
-using Walk = std::map<std::pair<int, int>, int>;
+using Walk = map<pair<int, int>, int>;
 
 Vertex bbmove(int n, const Vertex& x0, Edge e, double tol = 1e-6);
 
