@@ -151,6 +151,63 @@ void gb_test(string k) {
 }
 
 
+void test_tetrahedron_instance() {
+    // Creating tetrahedron instance from explicit adjacency matrix
+    Vertex x = Vertex();
+    vector<vector<double>> x_mat;
+    x_mat.emplace_back(vector{0.0, 0.5, 0.5, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0});
+    x_mat.emplace_back(vector{0.5, 0.0, 0.5, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0});
+    x_mat.emplace_back(vector{0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0});
+    x_mat.emplace_back(vector{1.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0});
+    x_mat.emplace_back(vector{0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0});
+    x_mat.emplace_back(vector{0.0, 0.0, 0.0, 0.5, 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0});
+    x_mat.emplace_back(vector{0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.0, 0.0, 0.0});
+    x_mat.emplace_back(vector{0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.5, 0.0, 0.0, 0.0});
+    x_mat.emplace_back(vector{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.0, 0.0, 1.0, 0.0});
+    x_mat.emplace_back(vector{0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5});
+    x_mat.emplace_back(vector{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.5});
+    x_mat.emplace_back(vector{0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.0});
+    for (int i = 0; i < 12; i++)
+        for (int j = i + 1; j < 12; j++)
+            if (x_mat[i][j] > 0)
+                x[{i, j}] = x_mat[i][j];
+
+    cout << "Hi all, I am the Tetrahedron Instance!" << endl;
+    cout << "1/2-triangles:" << endl;
+    cout << "\t(0, 1, 2)   (3, 4, 5)   (6, 7, 8)   (9, 10, 11)" << endl;
+    cout << "1-edges:" << endl;
+    cout << "\t(0, 3)   (1, 6)   (2, 9)   (5, 7)   (8, 10)   (11, 4)" << endl;
+    cout << endl;
+
+    for (auto& [e, value] : x)
+        cout << "(" << e.first << ", " << e.second << "): " << value << endl;
+    cout << endl;
+
+    // Study Gap^
+    OptHatSolution sol = solve_opt_hat(x);
+
+    cout << "Gap^ = " << 1 / sol.opt_value << endl;
+    cout << endl;
+
+    cout << "Optimal cost:" << endl;
+    for (auto& [e, value] : sol.opt_cost)
+        if (value > 0.0)
+            cout << "(" << e.first << ", " << e.second << "): " << value << endl;
+    cout << endl;
+
+    cout << "Optimal walk:" << endl;
+    for (auto& [e, value] : sol.opt_walk)
+        if (value > 0.0)
+            cout << "(" << e.first << ", " << e.second << "): " << value << endl;
+    cout << endl;
+
+    // Test fractional negligibility
+    cout << "Am I fractional negligible?" << endl;
+    cout << (is_fractional_negligible(x) ? "\tOhhhh Yesss!" : "\tI am afraid not...");
+    cout << endl;
+}
+
+
 int main(int argc, char *argv[]) {
     // int k = 8;
     // cout << "✨ Ready for k = " << k << endl;
@@ -161,20 +218,7 @@ int main(int argc, char *argv[]) {
     // gb_test(k_str);
 
 
-    Vertex x = tetrahedron_instance();
-    OptHatSolution sol = solve_opt_hat(x);
-
-    cout << "Gap^ = " << 1 / sol.opt_value << endl;
-
-    cout << endl;
-    cout << "Optimal cost:" << endl;
-    for (auto& [e, value] : sol.opt_cost)
-        cout << "(" << e.first + 1 << ", " << e.second + 1 << "): " << value << endl;
-
-    cout << endl;
-    cout << "Optimal walk:" << endl;
-    for (auto& [e, value] : sol.opt_walk)
-        cout << "(" << e.first + 1 << ", " << e.second + 1 << "): " << value << endl;
+    test_tetrahedron_instance();
 
     return 0;
 }

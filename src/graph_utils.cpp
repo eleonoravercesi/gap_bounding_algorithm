@@ -1,9 +1,8 @@
 #include "graph_utils.h"
 
-#include <functional>
 #include <ranges>
 
-using std::function, std::map, std::pair, std::vector;
+using std::map, std::pair, std::vector;
 
 
 namespace {

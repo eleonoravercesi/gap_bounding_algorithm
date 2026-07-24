@@ -1,5 +1,5 @@
-#ifndef MATH_PROG_EXTENDED_TEST_H
-#define MATH_PROG_EXTENDED_TEST_H
+#ifndef MATH_PROG_EXTENDED_OPT_HAT
+#define MATH_PROG_EXTENDED_OPT_HAT
 
 #include "utils.h"
 
@@ -17,10 +17,10 @@ struct OptHatSolution {
     double solve_time;
 };
 
-GTSPSolution solve_gtsp(const Cost& c, const vector<Edge>& forced_edges);
+GTSPSolution solve_gtsp(const Cost& c, const vector<Edge>& forced_edges = {});
 
-OptHatSolution solve_opt_hat(const Vertex& x);
+OptHatSolution solve_opt_hat(const Vertex& x, const vector<Edge>& contracted_edges = {});
 
-Vertex tetrahedron_instance();
+bool is_fractional_negligible(const Vertex& x);
 
-#endif //MATH_PROG_EXTENDED_TEST_H
+#endif //MATH_PROG_EXTENDED_OPT_HAT

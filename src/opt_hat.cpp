@@ -62,7 +62,7 @@ protected:
 };
 
 
-GTSPSolution solve_gtsp(const Cost& c, const vector<Edge>& forced_edges = {}) {
+GTSPSolution solve_gtsp(const Cost& c, const vector<Edge>& forced_edges) {
     vector<Edge> edges;
     for (const Edge& e : c | std::views::keys)
         edges.push_back(e);
@@ -129,7 +129,7 @@ GTSPSolution solve_gtsp(const Cost& c, const vector<Edge>& forced_edges = {}) {
 }
 
 
-OptHatSolution solve_opt_hat(const Vertex& x) {
+OptHatSolution solve_opt_hat(const Vertex& x, const vector<Edge>& contracted_edges) {
     vector<Edge> edges, one_edges;
     for (const Edge& e : x | std::views::keys) {
         if (x.at(e) > 0.0)
@@ -156,6 +156,8 @@ OptHatSolution solve_opt_hat(const Vertex& x) {
         if (x.at(e) > 0.0)
             c_vars[e] = model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
                 std::format("x_{}_{}", e.first, e.second));
+    for (const Edge& e : contracted_edges)
+        c_vars[e].set(GRB_DoubleAttr_UB, 0.0);
 
     model.update();
 
@@ -190,26 +192,15 @@ OptHatSolution solve_opt_hat(const Vertex& x) {
 }
 
 
-Vertex tetrahedron_instance() {
-    Vertex x = Vertex();
-    vector<vector<double>> x_mat;
-    x_mat.emplace_back(vector{0.0, 0.5, 0.5, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0});
-    x_mat.emplace_back(vector{0.5, 0.0, 0.5, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0});
-    x_mat.emplace_back(vector{0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0});
-    x_mat.emplace_back(vector{1.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0});
-    x_mat.emplace_back(vector{0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0});
-    x_mat.emplace_back(vector{0.0, 0.0, 0.0, 0.5, 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0});
-    x_mat.emplace_back(vector{0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.0, 0.0, 0.0});
-    x_mat.emplace_back(vector{0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.5, 0.0, 0.0, 0.0});
-    x_mat.emplace_back(vector{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.0, 0.0, 1.0, 0.0});
-    x_mat.emplace_back(vector{0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5});
-    x_mat.emplace_back(vector{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.5});
-    x_mat.emplace_back(vector{0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.0});
+bool is_fractional_negligible(const Vertex& x) {
+    double opt_hat = solve_opt_hat(x).opt_value;
 
-    for (int i = 0; i < 12; i++)
-        for (int j = i + 1; j < 12; j++)
-            if (x_mat[i][j] > 0)
-                x[{i, j}] = x_mat[i][j];
+    vector<Edge> contracted_edges;
+    for (const Edge& e : x | std::views::keys)
+        if (x.at(e) > TOLERANCE && x.at(e) < 1.0 - TOLERANCE)
+            contracted_edges.push_back(e);
+    double opt_hat0 = solve_opt_hat(x, contracted_edges).opt_value;
 
-    return x;
+    // Recall: Gap_hat = 1 / opt_hat
+    return opt_hat0 < opt_hat + TOLERANCE;
 }
