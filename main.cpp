@@ -88,7 +88,8 @@ void get_ancestors(int k) {
 void gb_test(string k) {
     // Here, k is from 3 onward!!
 
-    string filename = format("/home/vercee/Documents/math_prog_extended/ancestors/ancestors_new_{}.csv", k);
+    //string filename = format("/home/vercee/Documents/math_prog_extended/ancestors/ancestors_new_{}.csv", k);
+    string filename = format("/home/vercee/Documents/math_prog_extended/ancestors/ancestors_new_{}_more_iter.csv", k);
     vector<VertexFraction> x_list;
     x_list = read_ancestors(filename);
 
@@ -133,7 +134,7 @@ void gb_test(string k) {
         vector<Walk> w_start;
 
         double target_gap = 4.0/3.0;
-        result = GBe_algorithm(n_int, x_0_dict, target_gap, 20, 1e-6, 0);
+        result = GBe_algorithm(n_int, x_0_dict, target_gap, 40, 1e-6, 0);
         auto t2 = std::chrono::high_resolution_clock::now();
 
         /* Getting number of milliseconds as a double. */
@@ -156,8 +157,8 @@ int main(int argc, char *argv[]) {
     int k = 8;
     cout << "✨ Ready for k = " << k << endl;
     string k_str = itos(k);
-    cout << "✨ COMPUTING ANCESTORS ✨" << endl;
-    get_ancestors(k);
+    // cout << "✨ COMPUTING ANCESTORS ✨" << endl;
+    // get_ancestors(k);
     cout << endl << "✨ RUN GB ✨" << endl;
     gb_test(k_str);
 }
