@@ -1,11 +1,3 @@
-// Include nauty FIRST with extern "C" to avoid std::set conflict
-#ifdef HAVE_NAUTY
-extern "C" {
-    #include "nauty.h"
-    #include "gtools.h"
-}
-#endif
-
 #include "vertices_generator.h"
 #include "ppl.hh"
 using namespace std;
@@ -110,4 +102,3 @@ vector<VertexFraction> get_all_vertices_with_graph_constraints(int n, int k, vec
     }
     return vertices_this_graph;
 }
-

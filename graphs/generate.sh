@@ -1,7 +1,13 @@
-nauty_path="/home/vercee/libraries/nauty2_9_3"
+#!/bin/bash
 
-# Set k
-k=8
+# Check arguments
+if [ $# -ne 2 ]; then
+    echo "Usage: $0 <k> <nauty_path>"
+    exit 1
+fi
+
+k=$1
+nauty_path=$2
 
 n_min=$(expr $k + 3)
 n_max=$(( 2*k ))

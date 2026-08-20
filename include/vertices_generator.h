@@ -4,16 +4,21 @@
 
 #include <vector>
 #include "gmp.h"
-#include "nauty_wrapper.h"
 #include "ppl.hh"
 #include <format>
-#include <set>
 #include <algorithm>
 #include <cmath>
 using namespace std;
 
-// Define a new type for vertices in fractions
-// Structure to hold TSP solution results
+/**
+ * @brief Represents a vertex using exact rational values.
+ *
+ * The vertex is represented as a vector of numerators with a common
+ * denominator. The value of component i is given by v[i] / den.
+ *
+ * For a complete graph on n vertices, the vector v contains
+ * n(n-1)/2 components, one for each edge.
+ */
 struct VertexFraction {
     int den;  // Denominator
     vector<int> v; // Numerator
@@ -32,16 +37,30 @@ struct VertexFraction {
         }
     }
 
-    // Get n
+    /**
+     * @brief Returns the number of vertices of the underlying complete graph.
+     *
+     * @return The number of vertices n.
+     */
     int getn() {
         return (1  + sqrt(1 + 8 * v.size())) / 2 ;
     }
 
-    // Get numerators
+
+    /**
+     * @brief Get the numerators as vector of integers
+     * @return Returns the numerators
+     */
     vector<int> getNumerators() {
         return v;
     }
 
+    /**
+     * @brief This method does a nice printing of a vertex
+     *
+     * @param n, int, number of nodes
+     * @return The vertex as a string
+     */
     string toString(int n) {
         stringstream ss;
         ss << format("{},", n);
@@ -58,13 +77,24 @@ struct VertexFraction {
         return ss.str();
     }
 
-    // Is int? If den = 1
+
+    /**
+     * @brief Is this vertex integer?
+     *
+     * @return
+     */
     bool isInt() {
         return den == 1;
     }
 
 
-    // Number of non-zeros components
+    /**
+     * @brief Count the number of non zeros
+     *
+     * @param n , integer, number of nodes of the TSP
+     *
+     * @return  The number of non zeros as an integer
+     */
     int numberOfNonZeros(int n) {
         // It is easy to count the zeros
         int number_of_zeros = count(v.begin(), v.end(), 0);
@@ -72,98 +102,11 @@ struct VertexFraction {
         return m - number_of_zeros;
     }
 
-    // // Convert it to coloured graph
-    // graph* toGraph(int n, int &out_nd) {
-    //     // TODO this function must be verified another time at least
-    //     // Take vector<int> v
-    //     // Count all the different values -- excluding zero
-    //     std::set<int> unique_values; // I need the one of std, not the one of nauty
-    //
-    //     for (int val : v) {
-    //         if (val != 0) {  // Exclude zero
-    //             unique_values.insert(val);
-    //         }
-    //     }
-    //
-    //     // Sort unique values
-    //     vector<int> unique_values_sorted(unique_values.begin(), unique_values.end());
-    //
-    //     sort(unique_values_sorted.begin(), unique_values_sorted.end());
-    //
-    //     // Different non zeros values
-    //     int diff_values = unique_values.size();
-    //
-    //     int d;
-    //
-    //     // Get the value d such that diff_values <= 2**d - 1
-    //     d = ceil(log2(diff_values + 1));
-    //
-    //     // Make amn adjacency matrix
-    //     vector<vector<int>> adj(n * d, vector<int>(n * d, 0));
-    //
-    //     // Note: the formula i d' x n + n'
-    //
-    //     // Step 1: all the nodes with the same n' but different d are connectet
-    //     for (int n_prime = 0; n_prime < n; n_prime++) {
-    //         for (int d_prime = 0; d_prime < d - 1; d_prime++) {
-    //             int a = d_prime * n + n_prime;
-    //             int b = (d_prime + 1) * n + n_prime;
-    //
-    //             adj[a][b] = 1;
-    //             adj[b][a] = 1;
-    //         }
-    //     }
-    //
-    //     // Step 2: each layer is for just one symbol, apart from the last one, that is in all of them
-    //     int e = 0;
-    //     for (int i = 0; i < n; i++) {
-    //         for (int j = i + 1; j < n; j++) {
-    //             // Get the numerator
-    //             int v_e = v[e];
-    //             // Increase e
-    //             e++;
-    //             if (v_e != 0) {
-    //                 // Then there is an edge! with which weight? I need the index in the vector unique_values
-    //                 auto it = find(unique_values_sorted.begin(), unique_values_sorted.end(), v_e) - unique_values_sorted.begin();
-    //
-    //                 // Increase it by 1: given the doc, we want numbers from 1 to 2**d - 1
-    //                 it = it + 1;
-    //
-    //
-    //                 for (int d_prime = 0; d_prime < d; ++d_prime) {
-    //                     bool x_d_prime = (it >> d_prime) & 1;  // Extract bit i from it
-    //
-    //                     adj[d_prime * n + i][d_prime * n + j] = x_d_prime;
-    //                     adj[d_prime * n + j][d_prime * n + i] = x_d_prime;
-    //                 }
-    //
-    //             }
-    //         }
-    //     }
-    //
-    //     // From here: claude did it
-    //     int nd = n * d;  // Total number of nodes in the nauty graph
-    //     out_nd = nd;     // Return nd to the caller
-    //
-    //     // Convert adjacency matrix to nauty graph of size nd
-    //     int m = (nd + WORDSIZE - 1) / WORDSIZE;
-    //     graph* g = (graph*)malloc(nd * m * sizeof(graph));
-    //     if (!g) return nullptr;
-    //
-    //     for (int i = 0; i < nd * m; ++i) g[i] = 0;
-    //
-    //     for (int i = 0; i < nd; ++i) {
-    //         for (int j = 0; j < nd; ++j) {
-    //             if (adj[i][j] != 0) {
-    //                 ADDELEMENT(&g[i * m], j);
-    //             }
-    //         }
-    //     }
-    //
-    //     return g;
-    //
-    // }
-
+    /**
+     * @brief Computer a Counter of type (num, den) --> counter counting how many times a fraction appear in a vertex
+     *
+     * @return The counter in question
+     */
     map<pair<int,int>, int> toCounter() {
         vector<int> v_sorted = v;
         sort(v_sorted.begin(), v_sorted.end());
@@ -175,28 +118,14 @@ struct VertexFraction {
         return counter;
     }
 
-    bool isMinimal() {
-        for (int e = 0; e < v.size(); ++e) {
-            int num = v[e];
 
-            // If we find a "minimal" element, we can return true immediately
-            if (num > 0 && num % den != 0){ // It means that you cannot simplify num and den, so is minimal!
-                return true;
-            }
-            // TODO: Aggiusta: il metodo e' sbagliato, l'unico vettore non "minimal" qui e' il vettore di zeri.
-        }
-        // Only return false if we checked the WHOLE loop and never hit the 'true' condition
-        return false;
-    }
-
-    void Minimalize() {
-        if (not isMinimal()) {
-            for (int e = 0; e < v.size(); ++e) {
-                v[e] = v[e] / den; // Integer division, hence safe
-            }
-        }
-    }
-
+    /**
+     * @brief Convert the vertex x to a symmetric matrix that contains the NUMERATORS only
+     *
+     * @param n Number of nodes of the TSP
+     *
+     * @return The matrix in question
+     */
     vector<vector<int>> toMatrix(int n) {
         // Initialize n x n matrix with zeros
         vector<vector<int>> X(n, vector<int>(n, 0));
@@ -216,7 +145,16 @@ struct VertexFraction {
 };
 
 
-// Declaration of function provided by the implementation
+/**
+ * @brief Given a graph G, returns all the vertices of $P_{\text{SEP}^n } having the support graph contained in G and precisely n + k edges
+ *
+ * @param n An integer, with the dimension of the TSP
+ * @param k Integer, the k in question
+ * @param G Graph, the graph
+ * @param with_int If true, we also return integer vertices
+ *
+ * @return A Vector of Vertex Fraction
+ */
 vector<VertexFraction> get_all_vertices_with_graph_constraints(int n, int k, vector<int> G, bool with_int);
 
 #endif // VERTICES_GENERATOR_H

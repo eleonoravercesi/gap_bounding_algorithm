@@ -11,8 +11,6 @@
 #include "utils.h"
 
 using namespace std;
-// Represents a walk as edge multiplicities
-using Walk = map<pair<int,int>, int>;
 
 
 OptIISolution solve_optII(

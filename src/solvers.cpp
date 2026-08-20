@@ -1,5 +1,5 @@
 /* This has been created starting from https://docs.gurobi.com/projects/examples/en/current/examples/cpp/tsp_c++.html
- * and using the LLM Gurobot to adapt it to my needs
+ * and using the LLM Gurobot to adapt it to our needs
  **/
 
 #include "gurobi_c++.h"
@@ -10,14 +10,7 @@
 using namespace std;
 #include "utils.h"
 #include <map>
-
-
-// Structure to hold the solution
-struct TSPSolution {
-    vector<pair<int, int>> tour_edges;  // List of edges in the tour
-    double tour_value;                   // Total cost of the tour
-    bool success;                        // Whether a solution was found
-};
+#include "solvers.h"
 
 // Forward declarations
 void findsubtour(int n, double** sol, int* tourlenP, int* tour);
@@ -126,18 +119,6 @@ void findsubtour(int n, double** sol, int* tourlenP, int* tour)
   delete[] seen;
 }
 
-/**
- * Solves the Traveling Salesman Problem
- *
- * @param n Number of nodes
- * @param C Vector of costs for upper triangle (size = n*(n-1)/2)
- *          Order: (0,1), (0,2), ..., (0,n-1), (1,2), (1,3), ..., (n-2,n-1)
- * @param verbosity Verbosity level:
- *          0 --> Completely silent
- *          1 --> Only custom printing
- *          2 --> Everything
- * @return TSPSolution containing tour edges and total cost
- */
 TSPSolution solve_tsp(int n, const vector<double>& C, int verbosity) {
 
     TSPSolution result;
@@ -300,27 +281,6 @@ TSPSolution solve_tsp(int n, const vector<double>& C, int verbosity) {
 /**
  ************************* GraphTSP  *************************
  **/
-
-// struct to hold the Graphic TSP solution
-struct GraphTSPSolution {
-    vector<pair<pair<int, int>, int>> walk_edges;
-    vector<int> node_multiplicities;
-    double tour_value;
-    bool success;
-};
-
-/**
- * Solves the Graph Traveling Salesman Problem
- *
- * @param n Number of nodes
- * @param C Vector of costs for upper triangle (size = n*(n-1)/2)
- *          Order: (0,1), (0,2), ..., (0,n-1), (1,2), (1,3), ..., (n-2,n-1)
- * @param verbosity Verbosity level:
- *          0 = silent
- *          1 = basic output, custom printing
- *          2 = full Gurobi output
- * @return GraphTSPSolution containing walk edges with multiplicities and total cost
- */
 GraphTSPSolution solve_graph_tsp(
     int n,
     const map<pair<int,int>, double>& edge_costs,

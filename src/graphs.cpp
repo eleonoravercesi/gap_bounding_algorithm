@@ -3,9 +3,10 @@
 
 // Check isomorphism
 bool are_isomorphic_vertices(VertexFraction v1, VertexFraction v2, int n, int verbose) {
-    v1.Minimalize();
-    v2.Minimalize();
 
+    // Can consider the generators minimalized, see here https://github.com/BUGSENG/PPL/blob/92d0704d3309d55f39a647595f8383b86fcd57e1/src/Generator.cc#L463
+    // And here https://github.com/BUGSENG/PPL/blob/92d0704d3309d55f39a647595f8383b86fcd57e1/src/Polyhedron_public.cc#L3659
+    // And here https://github.com/BUGSENG/PPL/blob/92d0704d3309d55f39a647595f8383b86fcd57e1/src/Polyhedron_public.cc#L168
 
     if (v1.v.size() != v2.v.size()) {
         if (verbose == 1) {

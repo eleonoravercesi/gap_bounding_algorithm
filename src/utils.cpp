@@ -294,7 +294,6 @@ void print_vector_of_vector_of_int(vector<vector<int>>& v) {
     }
 }
 
-
 void print_progress_bar(int current, int total,
                         chrono::time_point<chrono::high_resolution_clock> start, int bar_width) {
     auto now = chrono::high_resolution_clock::now();

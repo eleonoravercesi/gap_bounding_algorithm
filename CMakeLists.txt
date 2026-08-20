@@ -18,11 +18,15 @@ if(NOT DEFINED ENV{GUROBI_HOME})
             "Please set it to your Gurobi installation directory.\n")
 endif()
 
+# Temp to understand what CMake sees
+message(STATUS "GUROBI_HOME = $ENV{GUROBI_HOME}")
+
 find_path(GUROBI_INCLUDE_DIR
         NAMES gurobi_c++.h
         PATHS "$ENV{GUROBI_HOME}/include"
         REQUIRED
 )
+
 message(STATUS "    include dir: ${GUROBI_INCLUDE_DIR}")
 
 find_library(GUROBI_LIBRARY
@@ -138,4 +142,4 @@ target_link_libraries(math_prog_extended PRIVATE
 # ==================================================
 # Set output name
 # ==================================================
-set_target_properties(math_prog_extended PROPERTIES OUTPUT_NAME "solver")
+set_target_properties(math_prog_extended PROPERTIES OUTPUT_NAME "GB")
