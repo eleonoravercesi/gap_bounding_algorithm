@@ -40,8 +40,6 @@ struct OptIISolution {
     int iterations;
 };
 
-struct GraphTSPSolution;
-
 /**
  * @brief Solves the OPT-II problem using a cutting-plane procedure.
  *

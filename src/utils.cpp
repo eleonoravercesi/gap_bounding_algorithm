@@ -282,17 +282,6 @@ vector<vector<int>> get_subsets_by_cardinality(int n, int cardinality) {
     return result;
 }
 
-void print_vector_of_vector_of_int(vector<vector<int>>& v) {
-    int n_vectors = v.size();
-    int i, j;
-    for (i = 0; i < n_vectors; ++i) {
-        vector<int> v_i = v[i];
-        for (j = 0; j < v_i.size(); ++j) {
-            cout << v_i[j] << " ";
-        }
-        cout << endl;
-    }
-}
 
 void print_progress_bar(int current, int total,
                         chrono::time_point<chrono::high_resolution_clock> start, int bar_width) {

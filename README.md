@@ -129,6 +129,24 @@ make
 ````
 Keep track of the path to your nauty installation, as you will need it in a later step.
 
+
+## Git LFS
+
+This repository uses [Git LFS](https://git-lfs.com/) to manage large files.
+
+Before cloning the repository, install Git LFS:
+
+```bash
+git lfs install
+````
+
+Then clone the repository normally:
+
+```bash
+git clone https://github.com/eleonoravercesi/gap_bounding_algorithm.git
+```
+
+
 ## Building and Running the Code
 
 ### 1. Build the solver

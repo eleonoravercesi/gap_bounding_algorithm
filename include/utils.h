@@ -112,13 +112,19 @@ void print_progress_bar(int current, int total,
  */
 vector<Walk> extend_walk(int n, const Walk& w, Edge e);
 
-
-// TODO what about these functions below?
-
-// Generate all subsets of a given set with specific cardinality
+/**
+ * @brief Generates all subsets of a set with a prescribed cardinality.
+ *
+ * Generates all subsets of the set \f$\{0,\ldots,n-1\}\f$ containing exactly
+ * @p cardinality elements.
+ *
+ * @param n Number of elements in the ground set.
+ * @param cardinality Required cardinality of each subset.
+ *
+ * @return A vector containing all subsets of \f$\{0,\ldots,n-1\}\f$ with
+ *         exactly @p cardinality elements.
+*/
 vector<vector<int>> get_subsets_by_cardinality(int n, int cardinality);
 
-// Print vector of vectors of int
-void print_vector_of_vector_of_int(vector<vector<int>>& v);
 
 
