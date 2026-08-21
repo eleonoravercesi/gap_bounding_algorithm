@@ -4,7 +4,12 @@ This repository contains the code used to reproduce the computational experiment
 
 ## Installation
 
-The experiments rely on the [Parma Polyhedra Library (PPL)](https://github.com/BUGSENG/PPL/tree/devel) and on Gurobi.
+The experiments rely on the following software:
+- [Parma Polyhedra Library (PPL)](https://github.com/BUGSENG/PPL/tree/devel);
+- [Gurobi](https://www.gurobi.com/);
+- [nauty](https://pallini.di.uniroma1.it/).
+
+
 ### Install PPL
 
 First, clone the PPL repository:
@@ -116,7 +121,7 @@ which gurobi_cl
 gurobi_cl
 ```
 
-### Nauty
+### Install Nauty
 The graph-generation step requires [nauty](https://pallini.di.uniroma1.it/), in particular the `geng` and `showg` executables.
 
 Download and extract the latest version of nauty from the official website, then compile it:

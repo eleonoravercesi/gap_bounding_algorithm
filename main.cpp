@@ -28,7 +28,7 @@ void get_ancestors(int k) {
 
     // Write a header on filename
     ofstream myfile;
-    myfile.open (filename_out);
+    myfile.open(filename_out);
     myfile << "n,xi\n";
     myfile.close();
 

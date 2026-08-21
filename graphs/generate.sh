@@ -21,6 +21,6 @@ do
   # Generate with nauty
   ${nauty_path}/geng -C -d3 $n  ${e_max}:${e_max} > ${n}_${k}.g6
 
-  # Show them in human readble format
+  # Show them in human readable format
   ${nauty_path}/showg -t -A -q  ${n}_${k}.g6 > ${n}_${k}.txt
 done

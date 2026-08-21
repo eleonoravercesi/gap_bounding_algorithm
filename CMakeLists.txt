@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(math_prog_extended)
+project(gap_bounding_algorithm)
 
 set(CMAKE_CXX_STANDARD 20)
 
@@ -18,15 +18,11 @@ if(NOT DEFINED ENV{GUROBI_HOME})
             "Please set it to your Gurobi installation directory.\n")
 endif()
 
-# Temp to understand what CMake sees
-message(STATUS "GUROBI_HOME = $ENV{GUROBI_HOME}")
-
 find_path(GUROBI_INCLUDE_DIR
         NAMES gurobi_c++.h
         PATHS "$ENV{GUROBI_HOME}/include"
         REQUIRED
 )
-
 message(STATUS "    include dir: ${GUROBI_INCLUDE_DIR}")
 
 find_library(GUROBI_LIBRARY
@@ -104,21 +100,19 @@ set(SOURCES
         src/GB_algorithm.cpp
         src/vertices_generator.cpp
         src/graphs.cpp
-        src/opt_hat.cpp
-        src/graph_utils.cpp
 )
 
 
 # ==================================================
 # Create executable
 # ==================================================
-add_executable(math_prog_extended ${SOURCES})
+add_executable(gap_bounding_algorithm ${SOURCES})
 
 
 # ==================================================
 # Include Directories
 # ==================================================
-target_include_directories(math_prog_extended PRIVATE
+target_include_directories(gap_bounding_algorithm PRIVATE
         include
         /usr/include/
         ${GUROBI_INCLUDE_DIR}
@@ -131,7 +125,7 @@ target_include_directories(math_prog_extended PRIVATE
 # ==================================================
 # Link Libraries (ORDER MATTERS!)
 # ==================================================
-target_link_libraries(math_prog_extended PRIVATE
+target_link_libraries(gap_bounding_algorithm PRIVATE
         ${PPL_LIBRARY}
         ${GMPXX_LIBRARY}
         ${GMP_LIBRARY}
@@ -139,7 +133,8 @@ target_link_libraries(math_prog_extended PRIVATE
         ${GUROBI_LIBRARY}
 )
 
+
 # ==================================================
 # Set output name
 # ==================================================
-set_target_properties(math_prog_extended PROPERTIES OUTPUT_NAME "GB")
+set_target_properties(gap_bounding_algorithm PROPERTIES OUTPUT_NAME "GB")
