@@ -177,6 +177,11 @@ make
 
 If the compilation is successful, the `GB` executable will be created in the `build` directory.
 
+Move back in the root directory of the repository.
+
+```bash
+cd ..
+```
 ### 2. Run the default experiment: $k=3$
 
 The default setting uses $k=3$. From the root directory of the repository, run:

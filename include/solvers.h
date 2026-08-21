@@ -43,33 +43,4 @@ struct GraphTSPSolution {
     bool success;
 };
 
-/**
- * Solves the Traveling Salesman Problem
- *
- * @param n Number of nodes
- * @param C Vector of costs for upper triangle (size = n*(n-1)/2)
- *          Order: (0,1), (0,2), ..., (0,n-1), (1,2), (1,3), ..., (n-2,n-1)
- * @param verbosity Verbosity level:
- *          0 --> Completely silent
- *          1 --> Only custom printing
- *          2 --> Everything
- * @return TSPSolution containing tour edges and total cost
- */
-//TODO ma dove lo uso???
-TSPSolution solve_tsp(int n, const std::vector<double>& C, int verbosity);
-
-
-/**
- * Solves the Graph Traveling Salesman Problem
- *
- * @param n Number of nodes
- * @param C Vector of costs for upper triangle (size = n*(n-1)/2)
- *          Order: (0,1), (0,2), ..., (0,n-1), (1,2), (1,3), ..., (n-2,n-1)
- * @param verbosity Verbosity level:
- *          0 = silent
- *          1 = basic output, custom printing
- *          2 = full Gurobi output
- * @return GraphTSPSolution containing walk edges with multiplicities and total cost
- */
-GraphTSPSolution solve_graph_tsp(int n, const map<pair<int,int>, double>& edge_costs, int verbosity);
 #endif // SOLVERS_H

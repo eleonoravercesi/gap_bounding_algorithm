@@ -96,7 +96,6 @@ set(SOURCES
         src/readers.cpp
         src/utils.cpp
         src/solvers.cpp
-        src/opt_plus.cpp
         src/GB_algorithm.cpp
         src/vertices_generator.cpp
         src/graphs.cpp
